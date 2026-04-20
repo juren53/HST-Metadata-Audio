@@ -1,0 +1,14 @@
+
+# Metadata dictionary with ID3 tag keys
+metadata = {
+    'TIT1': 'TIT1: Title - HST playing pinano',
+    'TIT2': 'TIT2: Title - HST playing the Black Hawk Watz',
+    'TIT3': 'TIT3: Title - HST playing the Black Hawk Watz in the White House',
+    'TPE1': 'TPEI: Artist - Harry Truman',
+    'TALB': 'TALB: Album ',
+    'TYER': 'TYER: Year 1948',
+    'TDAT': 'TDAT: September 30, 1948',
+    'TCOP': 'TCOP: Copyright - Restricted',
+    'TCMT': 'TCMT: Comment - HST playing piano',
+    'TOWN': 'TOWN: Owner - Harry S. Truman Presidental Library', 
+
