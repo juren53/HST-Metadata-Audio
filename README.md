@@ -1,4 +1,4 @@
-# Audio Metadata and Uploads to the NARA Catalog
+# HSTL Audio Metadata Project
 
 This portion of the project will embed metadata from the Truman Library archives into approximately 2,000 audio files (WAV and MP3) for upload to the National Archives and Records Administration (NARA) catalog.
 
