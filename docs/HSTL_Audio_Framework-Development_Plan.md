@@ -404,36 +404,33 @@ validation:
 
 The following metadata fields are embedded into each MP3 file using Mutagen. This table reflects the current mapping from ATW:
 
-| ID3 Tag        | Description              | Source / Value                                                        |
-| -------------- | ------------------------ | --------------------------------------------------------------------- |
-| TIT2           | Title                    | title (CSV)                                                           |
-| TIT1           | Grouping                 | (static) NARA-HST-SRC Sound Recordings Collection                    |
-| TIT3           | Subtitle/Description     | Description + Date (CSV)                                              |
-| COMM           | Comment                  | Description + Date (CSV)                                              |
-| ISBJ           | Subject                  | Description + Date (CSV)                                              |
-| dc:description | XMP Description          | Description + Date (CSV)                                              |
-| xmpDM:logComment | XMP Log Comment        | Description + Date (CSV)                                              |
-| ©cmt           | iTunes Comment           | Description + Date (CSV)                                              |
-| TALB           | Album / Accession No.    | Accession Number (CSV)                                                |
-| IPRD           | Product / Accession      | Accession Number (CSV)                                                |
-| TPE1           | Artist                   | (static) Harry S. Truman Library                                      |
-| IPLS           | Involved People          | Speakers (CSV) — **known issue in prototype: hardcoded; fix in HAM**  |
-| TCOP           | Copyright / Restrictions | Restrictions (CSV)                                                    |
-| TPUB           | Publisher                | Production and Copyright (CSV)                                        |
-| ©pub           | iTunes Publisher         | Production and Copyright (CSV)                                        |
-| dc:publisher   | XMP Publisher            | Production and Copyright (CSV)                                        |
-| ISRC           | Source                   | (static) Harry S. Truman Library                                      |
-| TLOC           | Location                 | Place (CSV)                                                           |
-| ICRD           | Creation Date (raw)      | Date original string (CSV)                                            |
-| TDAT           | Date DDMM                | Date converted to DDMM                                                |
-| TYER           | Year                     | Date converted year (YYYY)                                            |
-| TORY           | Original Year            | Date converted year (YYYY)                                            |
-| TRDA           | Recording Date           | Date ISO 8601 (YYYY-MM-DD)                                            |
-| TOFN           | Original Filename        | Accession Number + .mp3                                               |
-| TCON           | Genre                    | (static) speech                                                       |
-| WOAS           | Source URL               | (static) https://www.trumanlibrary.gov/library/sound-recordings-collection |
-| WXXX           | External URL             | (static) https://catalog.archives.gov/                                |
-| TEXT           | Processing Note          | (static) script/tool version string                                   |
+| ID3 Tag / Frame    | Description              | Source / Value                                                        | Mutagen Notes                          |
+| ------------------ | ------------------------ | --------------------------------------------------------------------- | -------------------------------------- |
+| TIT2               | Title                    | title (CSV)                                                           | Native frame                           |
+| TIT1               | Grouping                 | (static) NARA-HST-SRC Sound Recordings Collection                    | Native frame                           |
+| TIT3               | Subtitle/Description     | Description + Date (CSV)                                              | Native frame                           |
+| COMM               | Comment                  | Description + Date (CSV)                                              | Native frame                           |
+| TXXX:ISBJ          | Subject                  | Description + Date (CSV)                                              | No native ID3 frame; write as TXXX     |
+| TALB               | Album / Accession No.    | Accession Number (CSV)                                                | Native frame                           |
+| TXXX:IPRD          | Product / Accession      | Accession Number (CSV)                                                | No native ID3 frame; write as TXXX     |
+| TPE1               | Artist                   | (static) Harry S. Truman Library                                      | Native frame                           |
+| IPLS               | Involved People          | Speakers (CSV) — **known issue in prototype: hardcoded; fix in HAM**  | ID3v2.3 only; requires `v2_version=3`  |
+| TCOP               | Copyright / Restrictions | Restrictions (CSV)                                                    | Native frame                           |
+| TPUB               | Publisher                | Production and Copyright (CSV)                                        | Native frame                           |
+| TSRC               | ISRC / Source            | (static) Harry S. Truman Library                                      | Native frame (prototype used key ISRC) |
+| TLOC               | Location                 | Place (CSV)                                                           | Non-standard; write as TXXX:TLOC       |
+| ICRD               | Creation Date (raw)      | Date original string (CSV)                                            | Write as TXXX:ICRD (RIFF/INFO key)     |
+| TDAT               | Date DDMM                | Date converted to DDMM                                                | ID3v2.3 only; requires `v2_version=3`  |
+| TYER               | Year                     | Date converted year (YYYY)                                            | ID3v2.3 only; requires `v2_version=3`  |
+| TORY               | Original Year            | Date converted year (YYYY)                                            | ID3v2.3 only; requires `v2_version=3`  |
+| TRDA               | Recording Date           | Date ISO 8601 (YYYY-MM-DD)                                            | ID3v2.3 only; requires `v2_version=3`  |
+| TOFN               | Original Filename        | Accession Number + .mp3                                               | Native frame                           |
+| TCON               | Genre                    | (static) speech                                                       | Native frame                           |
+| WOAS               | Source URL               | (static) https://www.trumanlibrary.gov/library/sound-recordings-collection | Native frame                      |
+| WXXX               | External URL             | (static) https://catalog.archives.gov/                                | Native frame                           |
+| TEXT               | Processing Note          | (static) script/tool version string                                   | Native frame                           |
+
+> **Note:** Tags `dc:description`, `xmpDM:logComment`, `©cmt`, `©pub`, and `dc:publisher` from the ATW prototype are **not supported by Mutagen for MP3 files** (XMP and iTunes © tags are MP4-only in Mutagen). These were experimental additions in v0.12d and are excluded from the HAM framework tag set.
 
 ## Multi-Batch Workflow
 
@@ -547,6 +544,7 @@ python hstl_audio.py batches
 ## Risk Mitigation
 
 - **Mutagen Not Installed**: Pre-flight `import mutagen` check; fail with `pip install mutagen` instructions
+- **ID3v2.3 Frame Loss**: Mutagen defaults to ID3v2.4; TDAT, TRDA, TORY, TYER, IPLS are silently dropped unless saved with `v2_version=3` — always pass this parameter in Step 3
 - **FFmpeg Not Found**: Pre-flight check before Step 4 only; clear installation instructions
 - **CSV Format Changes**: Validate column names on load; fail fast with actionable error
 - **Invalid Dates**: Validate all date strings before any tag embedding begins
