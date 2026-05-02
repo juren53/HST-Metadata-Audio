@@ -10,7 +10,7 @@ The HSTL Audio Framework is an application that orchestrates all components of t
 - **Branch**: `master` (main branch)
 - **Local Repository**: `C:\Users\juren\Projects\HST-Metadata`
 - **Audio Project Path**: `Audio/`
-- **Current Status**: Active testing and development (script version 0.09)
+- **Current Status**: Active testing and development (script version 0.12d; Mutagen adopted for metadata embedding)
 
 ## Project Structure (Proposed Framework)
 
@@ -26,7 +26,7 @@ C:\Users\juren\Projects\HST-Metadata\Audio\
 │   ├── base_step.py               # Base class for all steps
 │   ├── step1_csv_prep.py          # CSV metadata preparation & validation
 │   ├── step2_csv_validation.py    # Date conversion & field validation
-│   ├── step3_metadata_embed.py    # FFmpeg metadata tag embedding
+│   ├── step3_metadata_embed.py    # Mutagen metadata tag embedding
 │   ├── step4_thumbnail_embed.py   # Thumbnail creation & embedding
 │   └── step5_validation.py        # Output validation & reporting
 ├── utils/
@@ -152,7 +152,7 @@ class BatchRegistry:
 - **Summary Reports**: Detailed reports after each step completion
 - **Dry-run Mode**: Validation without making changes (--dry-run flag)
 - **Graceful Degradation**: Continue processing when non-critical errors occur
-- **FFmpeg Dependency Check**: Verify FFmpeg is installed and accessible before any processing
+- **Dependency Check**: Verify mutagen package is installed (Step 3); verify FFmpeg is installed and accessible before Step 4 (thumbnail generation)
 
 #### Quality Assurance
 
@@ -168,20 +168,22 @@ class BatchRegistry:
 | ---- | ---------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
 | 1    | Prepare CSV metadata file                      | Confirm required columns exist: title, Accession Number, Date, Restrictions, Description, Place, Speakers, Production and Copyright |
 | 2    | Validate & clean CSV data                      | Date format conversion (DD-MMM-YY → ISO 8601), field completeness check, unicode/encoding issues         |
-| 3    | Embed metadata tags into MP3 files             | FFmpeg exit codes, MP3 count matches CSV row count, spot-check tags with external tool                   |
+| 3    | Embed metadata tags into MP3 files             | Mutagen write success, MP3 count matches CSV row count, spot-check tags with external tool               |
 | 4    | Create & embed custom thumbnails               | Thumbnail generation success, final MP3 count matches input count                                        |
 | 5    | Output validation & reporting                  | Tag readback verification, file size sanity checks, summary report                                       |
 
 ## Existing Code to Integrate
 
-### Available in Testing/:
+### Available in root directory:
 
-- **Steps 2-4**: `audio-tags-09.py` - Core script combining date conversion, metadata embedding, and thumbnail embedding
+- **Steps 2-4**: `audio-tags-12d.py` (v0.12d) - Proven prototype combining date conversion, metadata embedding, and thumbnail embedding
   - Date parsing logic (DD-MMM-YY → ISO 8601)
-  - Complete FFmpeg metadata command construction
-  - ID3 tag field mappings (TIT2, TALB, TPE1, COMM, TCOP, TLOC, TRDA, etc.)
-  - Thumbnail overlay generation (drawtext filter)
-  - Two-pass FFmpeg approach (metadata first, then thumbnail)
+  - ID3 tag field mappings (TIT2, TALB, TPE1, COMM, TCOP, TLOC, TRDA, TCON, etc.) — see table below
+  - Thumbnail overlay generation using FFmpeg `drawtext` filter (accession number on base PNG)
+  - Two-pass FFmpeg approach for Step 4: pass 1 generates custom thumbnail JPEG, pass 2 embeds it into MP3
+  - **Note**: Step 3 metadata embedding will be reimplemented using Mutagen in the framework (replacing FFmpeg for tag writing)
+
+- **Step 1 utility**: `match-audio-files.py` - Matches MP3 files in working directory against accession numbers from CSV; reports counts and unmatched files. Useful as a pre-flight check before Step 3.
 
 ### Key Reference Files:
 
@@ -205,16 +207,17 @@ class BatchRegistry:
 
 2. **Step Integration** (Priority Order)
 
-   - Step 2: CSV validation & date conversion (extract from `audio-tags-09.py`)
-   - Step 3: Metadata embedding (extract FFmpeg metadata logic from `audio-tags-09.py`)
-   - Step 4: Thumbnail creation & embedding (extract thumbnail logic from `audio-tags-09.py`)
-   - Step 1: CSV preparation & structural validation (new implementation)
+   - Step 2: CSV validation & date conversion (extract from `audio-tags-12d.py`)
+   - Step 3: Metadata embedding (reimplement using Mutagen; reference `audio-tags-12d.py` for tag mappings)
+   - Step 4: Thumbnail creation & embedding (extract FFmpeg thumbnail logic from `audio-tags-12d.py`)
+   - Step 1: CSV preparation & structural validation (incorporate `match-audio-files.py` logic; new implementation)
    - Step 5: Output validation & reporting (new implementation)
 
 3. **Validation & Quality Assurance**
 
    - CSV field validation
-   - FFmpeg dependency verification
+   - Mutagen package availability check (Step 3)
+   - FFmpeg dependency verification (Step 4 only)
    - Tag readback verification utilities
    - Summary report generation
 
@@ -260,24 +263,24 @@ class Pipeline:
 
 ```python
 class Step3_MetadataEmbed(StepProcessor):
-    """Metadata embedding step using FFmpeg"""
+    """Metadata embedding step using Mutagen"""
 
     def validate_inputs(self, context):
         # Check MP3 files exist in input directory
         # Verify CSV file is present and parsed
-        # Check FFmpeg is installed and accessible
+        # Verify mutagen package is importable
         return ValidationResult()
 
     def execute(self, context):
-        # Build FFmpeg metadata command per record
-        # Run FFmpeg for each MP3/CSV row pair
-        # Write output to tmp/ directory
-        # Generate processing report
+        # Copy MP3 to tmp/ to preserve originals
+        # Open each MP3 with mutagen.id3.ID3
+        # Write all tag frames (TIT2, TALB, TRDA, etc.) per CSV row
+        # Save file, generate processing report
         return StepResult()
 
     def validate_outputs(self, context):
         # Verify output MP3 count matches CSV row count
-        # Check FFmpeg exit codes
+        # Read back tags with mutagen to confirm accuracy
         # Spot-check metadata on first/last file
         return ValidationResult()
 ```
@@ -331,7 +334,7 @@ hstl_audio.py state --history           # Show processing history
 # Advanced Validation
 hstl_audio.py validate --pre-flight     # Check all requirements before starting
 hstl_audio.py validate --paths          # Validate all directory paths
-hstl_audio.py validate --dependencies   # Check FFmpeg and other external tool dependencies
+hstl_audio.py validate --dependencies   # Check mutagen package and FFmpeg (thumbnail) dependencies
 ```
 
 ### Configuration Options
@@ -344,7 +347,7 @@ hstl_audio.py config --step 3 --set id3v2_version 3
 
 # Global settings
 hstl_audio.py config --set log_level DEBUG
-hstl_audio.py config --set ffmpeg_path /usr/bin/ffmpeg
+hstl_audio.py config --set ffmpeg_path /usr/bin/ffmpeg    # used by Step 4 only
 ```
 
 ## Data Directory Structure
@@ -355,7 +358,7 @@ Project Data Directory/ (Per Batch)
 │   ├── mp3/                   # Original MP3 files (source)
 │   └── csv/                   # CSV metadata file
 ├── output/
-│   ├── tmp/                   # Intermediate FFmpeg output (Step 3)
+│   ├── tmp/                   # Intermediate Mutagen output (Step 3); FFmpeg thumbnail staging (Step 4)
 │   └── processed/             # Final tagged MP3 files (Step 4)
 ├── reports/                   # Step reports and summaries
 ├── logs/                      # Processing logs
@@ -391,41 +394,46 @@ step_configurations:
     thumbnail_base_image: "assets/HST-thumbnail-c.png"
   step3:
     id3v2_version: 3
-    ffmpeg_overwrite: true
 
 validation:
   strict_mode: true
   auto_backup: true
 ```
 
-## ID3 Tag Field Mappings
+## Audio Metadata Tag Field Mappings
 
-The following metadata fields are embedded into each MP3 file. This table captures the current mapping from `audio-tags-09.py` v0.09:
+The following metadata fields are embedded into each MP3 file using Mutagen. This table reflects the current mapping from ATW:
 
-| ID3 Tag | Description          | Source CSV Column          |
-| ------- | -------------------- | -------------------------- |
-| TIT2    | Title                | title                      |
-| TIT1    | Grouping             | (static) NARA-HST-SRC      |
-| TIT3    | Subtitle/Description | Description                |
-| COMM    | Comment              | Description                |
-| ISBJ    | Subject              | Description                |
-| TALB    | Album/Accession No.  | Accession Number           |
-| IPRD    | Product/Accession    | Accession Number           |
-| TPE1    | Artist               | (static) Harry S. Truman Library |
-| IPLS    | Involved People      | Speakers                   |
-| TCOP    | Copyright/Restrict.  | Restrictions               |
-| TPUB    | Publisher            | Production and Copyright   |
-| ISRC    | Source               | (static) Harry S. Truman Library |
-| TLOC    | Location             | Place                      |
-| ICRD    | Creation Date (raw)  | Date (original string)     |
-| TDAT    | Date DDMM            | Date (converted)           |
-| TYER    | Year                 | Date (converted year)      |
-| TORY    | Original Year        | Date (converted year)      |
-| TRDA    | Recording Date       | Date (ISO 8601)            |
-| TOFN    | Original Filename    | Accession Number + .mp3    |
-| WOAS    | Source URL           | (static) trumanlibrary.gov |
-| WXXX    | External URL         | (static) catalog.archives.gov |
-| TEXT    | Processing Note      | (static) script version    |
+| ID3 Tag        | Description              | Source / Value                                                        |
+| -------------- | ------------------------ | --------------------------------------------------------------------- |
+| TIT2           | Title                    | title (CSV)                                                           |
+| TIT1           | Grouping                 | (static) NARA-HST-SRC Sound Recordings Collection                    |
+| TIT3           | Subtitle/Description     | Description + Date (CSV)                                              |
+| COMM           | Comment                  | Description + Date (CSV)                                              |
+| ISBJ           | Subject                  | Description + Date (CSV)                                              |
+| dc:description | XMP Description          | Description + Date (CSV)                                              |
+| xmpDM:logComment | XMP Log Comment        | Description + Date (CSV)                                              |
+| ©cmt           | iTunes Comment           | Description + Date (CSV)                                              |
+| TALB           | Album / Accession No.    | Accession Number (CSV)                                                |
+| IPRD           | Product / Accession      | Accession Number (CSV)                                                |
+| TPE1           | Artist                   | (static) Harry S. Truman Library                                      |
+| IPLS           | Involved People          | Speakers (CSV) — **known issue in prototype: hardcoded; fix in HAM**  |
+| TCOP           | Copyright / Restrictions | Restrictions (CSV)                                                    |
+| TPUB           | Publisher                | Production and Copyright (CSV)                                        |
+| ©pub           | iTunes Publisher         | Production and Copyright (CSV)                                        |
+| dc:publisher   | XMP Publisher            | Production and Copyright (CSV)                                        |
+| ISRC           | Source                   | (static) Harry S. Truman Library                                      |
+| TLOC           | Location                 | Place (CSV)                                                           |
+| ICRD           | Creation Date (raw)      | Date original string (CSV)                                            |
+| TDAT           | Date DDMM                | Date converted to DDMM                                                |
+| TYER           | Year                     | Date converted year (YYYY)                                            |
+| TORY           | Original Year            | Date converted year (YYYY)                                            |
+| TRDA           | Recording Date           | Date ISO 8601 (YYYY-MM-DD)                                            |
+| TOFN           | Original Filename        | Accession Number + .mp3                                               |
+| TCON           | Genre                    | (static) speech                                                       |
+| WOAS           | Source URL               | (static) https://www.trumanlibrary.gov/library/sound-recordings-collection |
+| WXXX           | External URL             | (static) https://catalog.archives.gov/                                |
+| TEXT           | Processing Note          | (static) script/tool version string                                   |
 
 ## Multi-Batch Workflow
 
@@ -479,10 +487,10 @@ python hstl_audio.py batches
 
 2. **Step Modules (Incremental)**
 
-   - Step 2: CSV validation & date conversion (refactor from `audio-tags-09.py`)
-   - Step 3: Metadata embedding (refactor FFmpeg logic from `audio-tags-09.py`)
-   - Step 4: Thumbnail creation & embedding (refactor from `audio-tags-09.py`)
-   - Step 1: CSV preparation & structural validation (new)
+   - Step 2: CSV validation & date conversion (refactor from `audio-tags-12d.py`)
+   - Step 3: Metadata embedding (implement with Mutagen; reference `audio-tags-12d.py` for tag mappings)
+   - Step 4: Thumbnail creation & embedding (refactor FFmpeg thumbnail logic from `audio-tags-12d.py`)
+   - Step 1: CSV preparation & structural validation (incorporate `match-audio-files.py` logic)
    - Step 5: Output validation & reporting (new)
 
 3. **Integration Testing**
@@ -517,7 +525,8 @@ python hstl_audio.py batches
 ## Dependencies
 
 - Python 3.8+
-- FFmpeg (external, must be installed and on PATH)
+- **mutagen** — ID3 metadata tag reading/writing (Step 3; replaces FFmpeg for tag embedding)
+- **FFmpeg** (external, must be installed and on PATH) — thumbnail image generation only (Step 4)
 - PyYAML (configuration)
 - colorama (CLI colors)
 - tqdm (progress bars)
@@ -532,17 +541,18 @@ python hstl_audio.py batches
 - Integration tests using `two.csv` (2-record minimal dataset)
 - Integration tests using `short.csv` (8-record subset)
 - Full-scale test with `audio.csv`
-- FFmpeg command construction validation (dry-run mode)
-- Tag readback verification after embedding
+- Mutagen tag-write validation (dry-run mode: build tag dict, verify keys/values without writing)
+- Tag readback verification after embedding (re-read with mutagen.id3.ID3 and compare to CSV)
 
 ## Risk Mitigation
 
-- **FFmpeg Not Found**: Pre-flight check with clear installation instructions
+- **Mutagen Not Installed**: Pre-flight `import mutagen` check; fail with `pip install mutagen` instructions
+- **FFmpeg Not Found**: Pre-flight check before Step 4 only; clear installation instructions
 - **CSV Format Changes**: Validate column names on load; fail fast with actionable error
-- **Invalid Dates**: Validate all date strings before any FFmpeg processing begins
+- **Invalid Dates**: Validate all date strings before any tag embedding begins
 - **MP3 File Missing**: Log missing files, skip with warning, continue batch
-- **Data Loss Prevention**: Write to tmp/ before final output; originals never overwritten
-- **Performance**: Progress bars for large batches (3,757 files in full dataset)
+- **Data Loss Prevention**: Copy to tmp/ before writing tags; originals never modified in place
+- **Performance**: Mutagen tag writes are fast (no audio re-encoding); progress bars for large batches (3,757 files)
 
 ---
 
@@ -559,25 +569,27 @@ python hstl_audio.py batches
 
 ### Upcoming
 
-1. Refactor Step 2: CSV validation & date conversion from `audio-tags-09.py`
-2. Refactor Step 3: Metadata embedding from `audio-tags-09.py`
-3. Refactor Step 4: Thumbnail creation & embedding from `audio-tags-09.py`
-4. Implement Step 1: CSV preparation & structural validation
+1. Refactor Step 2: CSV validation & date conversion from `audio-tags-12d.py`
+2. Implement Step 3: Metadata embedding using Mutagen (tag mappings from `audio-tags-12d.py`)
+3. Refactor Step 4: Thumbnail creation & embedding (FFmpeg drawtext logic from `audio-tags-12d.py`)
+4. Implement Step 1: CSV preparation & structural validation (incorporating `match-audio-files.py`)
 5. Implement Step 5: Output validation & reporting
 6. Build pipeline orchestration
 7. Add comprehensive error handling
-8. Complete documentation
+8. Fix IPLS tag: map to Speakers CSV column (currently hardcoded in prototype)
+9. Complete documentation
 
 ## Notes
 
-- `audio-tags-09.py` is the proven prototype — refactor into modules, don't rewrite logic
+- `audio-tags-12d.py` (v0.12d) is the proven prototype — extract logic into modules, don't rewrite
+- `match-audio-files.py` is a useful pre-flight utility to integrate into Step 1
+- **Mutagen** replaces FFmpeg for all metadata tag writing (Step 3); no audio re-encoding, fast
+- FFmpeg is still required for Step 4 thumbnail generation (drawtext filter overlays accession number on base PNG)
+- Step 4 remains a two-pass operation: pass 1 generates custom JPEG thumbnail, pass 2 embeds it into MP3
 - Use `two.csv` (2 records) for rapid iteration during development
 - Full production dataset: 3,757 MP3 files in `LIST_HSTL-Audio-Files.csv`
-- FFmpeg is the core dependency; all metadata embedding goes through it
-- Thumbnails use FFmpeg `drawtext` filter to overlay accession number on base PNG
-- Two-pass FFmpeg approach: pass 1 embeds metadata tags, pass 2 adds thumbnail
 - Windows PowerShell/bash environment
 - Data directories separate from framework code location
 - CLI implementation first, GUI in Phase 2
 
-Updated: 2026-04-20
+Updated: 2026-05-02
