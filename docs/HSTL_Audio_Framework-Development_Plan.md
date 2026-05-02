@@ -1,4 +1,4 @@
-# HSTL Audio Framework - Development Plan
+# HSTL Audio Metadata Framework - Development Plan
 
 ## Project Overview
 
