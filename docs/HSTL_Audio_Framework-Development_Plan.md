@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-The HSTL Audio Framework is an application that orchestrates all components of the HSTL Audio Metadata Project. It manages the complete process from CSV metadata preparation through final tagged MP3 creation, embedding ID3 metadata and custom thumbnails into the Harry S. Truman Library sound recordings collection.
+The HSTL Audio Framework is an application that orchestrates all components of the HSTL Audio Metadata Project. It manages the complete process from CSV metadata preparation through final tagged MP3 creation, embedding audio metadata and custom album art thumbnails into the Harry S. Truman Library sound recordings collection.
 
 ## Repository Information
 
