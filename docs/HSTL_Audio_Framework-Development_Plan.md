@@ -152,7 +152,7 @@ class BatchRegistry:
 - **Summary Reports**: Detailed reports after each step completion
 - **Dry-run Mode**: Validation without making changes (--dry-run flag)
 - **Graceful Degradation**: Continue processing when non-critical errors occur
-- **Dependency Check**: Verify mutagen package is installed (Step 3); verify FFmpeg is installed and accessible before Step 4 (thumbnail generation)
+- **Dependency Check**: Verify mutagen package is installed (Step 3); verify Pillow package is installed before Step 4 (thumbnail generation)
 
 #### Quality Assurance
 
@@ -179,9 +179,10 @@ class BatchRegistry:
 - **Steps 2-4**: `audio-tags-12d.py` (v0.12d) - Proven prototype combining date conversion, metadata embedding, and thumbnail embedding
   - Date parsing logic (DD-MMM-YY → ISO 8601)
   - ID3 tag field mappings (TIT2, TALB, TPE1, COMM, TCOP, TLOC, TRDA, TCON, etc.) — see table below
-  - Thumbnail overlay generation using FFmpeg `drawtext` filter (accession number on base PNG)
-  - Two-pass FFmpeg approach for Step 4: pass 1 generates custom thumbnail JPEG, pass 2 embeds it into MP3
+  - Thumbnail overlay generation using FFmpeg `drawtext` filter (accession number on base PNG) — **replaced by Pillow in the framework**
+  - Two-pass FFmpeg approach for Step 4 (prototype only): pass 1 generates custom thumbnail JPEG, pass 2 embeds it into MP3
   - **Note**: Step 3 metadata embedding will be reimplemented using Mutagen in the framework (replacing FFmpeg for tag writing)
+  - **Note**: Step 4 thumbnail generation will be reimplemented using Pillow in the framework (replacing FFmpeg entirely; single-pass, no subprocess)
 
 - **Step 1 utility**: `match-audio-files.py` - Matches MP3 files in working directory against accession numbers from CSV; reports counts and unmatched files. Useful as a pre-flight check before Step 3.
 
@@ -209,7 +210,7 @@ class BatchRegistry:
 
    - Step 2: CSV validation & date conversion (extract from `audio-tags-12d.py`)
    - Step 3: Metadata embedding (reimplement using Mutagen; reference `audio-tags-12d.py` for tag mappings)
-   - Step 4: Thumbnail creation & embedding (extract FFmpeg thumbnail logic from `audio-tags-12d.py`)
+   - Step 4: Thumbnail creation & embedding (reimplement using Pillow; reference FFmpeg `drawtext` logic in `audio-tags-12d.py` for positioning/font parameters)
    - Step 1: CSV preparation & structural validation (incorporate `match-audio-files.py` logic; new implementation)
    - Step 5: Output validation & reporting (new implementation)
 
@@ -217,7 +218,7 @@ class BatchRegistry:
 
    - CSV field validation
    - Mutagen package availability check (Step 3)
-   - FFmpeg dependency verification (Step 4 only)
+   - Pillow package availability check (Step 4)
    - Tag readback verification utilities
    - Summary report generation
 
@@ -334,7 +335,7 @@ hstl_audio.py state --history           # Show processing history
 # Advanced Validation
 hstl_audio.py validate --pre-flight     # Check all requirements before starting
 hstl_audio.py validate --paths          # Validate all directory paths
-hstl_audio.py validate --dependencies   # Check mutagen package and FFmpeg (thumbnail) dependencies
+hstl_audio.py validate --dependencies   # Check mutagen (Step 3) and Pillow (Step 4) package dependencies
 ```
 
 ### Configuration Options
@@ -347,7 +348,6 @@ hstl_audio.py config --step 3 --set id3v2_version 3
 
 # Global settings
 hstl_audio.py config --set log_level DEBUG
-hstl_audio.py config --set ffmpeg_path /usr/bin/ffmpeg    # used by Step 4 only
 ```
 
 ## Data Directory Structure
@@ -358,7 +358,7 @@ Project Data Directory/ (Per Batch)
 │   ├── mp3/                   # Original MP3 files (source)
 │   └── csv/                   # CSV metadata file
 ├── output/
-│   ├── tmp/                   # Intermediate Mutagen output (Step 3); FFmpeg thumbnail staging (Step 4)
+│   ├── tmp/                   # Intermediate Mutagen output (Step 3); Pillow thumbnail staging (Step 4)
 │   └── processed/             # Final tagged MP3 files (Step 4)
 ├── reports/                   # Step reports and summaries
 ├── logs/                      # Processing logs
@@ -486,7 +486,7 @@ python hstl_audio.py batches
 
    - Step 2: CSV validation & date conversion (refactor from `audio-tags-12d.py`)
    - Step 3: Metadata embedding (implement with Mutagen; reference `audio-tags-12d.py` for tag mappings)
-   - Step 4: Thumbnail creation & embedding (refactor FFmpeg thumbnail logic from `audio-tags-12d.py`)
+   - Step 4: Thumbnail creation & embedding (reimplement using Pillow; no FFmpeg dependency)
    - Step 1: CSV preparation & structural validation (incorporate `match-audio-files.py` logic)
    - Step 5: Output validation & reporting (new)
 
@@ -522,13 +522,13 @@ python hstl_audio.py batches
 ## Dependencies
 
 - Python 3.8+
-- **mutagen** — ID3 metadata tag reading/writing (Step 3; replaces FFmpeg for tag embedding)
-- **FFmpeg** (external, must be installed and on PATH) — thumbnail image generation only (Step 4)
+- **mutagen** — ID3 metadata tag reading/writing (Step 3)
+- **Pillow** — album art thumbnail generation and text overlay (Step 4; replaces FFmpeg)
 - PyYAML (configuration)
 - colorama (CLI colors)
 - tqdm (progress bars)
 - pathlib (path handling)
-- csv, datetime, subprocess (standard library)
+- csv, datetime, io (standard library)
 - PyQt6 (Phase 2 only)
 
 ## Testing Strategy
@@ -545,7 +545,7 @@ python hstl_audio.py batches
 
 - **Mutagen Not Installed**: Pre-flight `import mutagen` check; fail with `pip install mutagen` instructions
 - **ID3v2.3 Frame Loss**: Mutagen defaults to ID3v2.4; TDAT, TRDA, TORY, TYER, IPLS are silently dropped unless saved with `v2_version=3` — always pass this parameter in Step 3
-- **FFmpeg Not Found**: Pre-flight check before Step 4 only; clear installation instructions
+- **Pillow Not Installed**: Pre-flight `import PIL` check before Step 4; fail with `pip install Pillow` instructions
 - **CSV Format Changes**: Validate column names on load; fail fast with actionable error
 - **Invalid Dates**: Validate all date strings before any tag embedding begins
 - **MP3 File Missing**: Log missing files, skip with warning, continue batch
@@ -569,7 +569,7 @@ python hstl_audio.py batches
 
 1. Refactor Step 2: CSV validation & date conversion from `audio-tags-12d.py`
 2. Implement Step 3: Metadata embedding using Mutagen (tag mappings from `audio-tags-12d.py`)
-3. Refactor Step 4: Thumbnail creation & embedding (FFmpeg drawtext logic from `audio-tags-12d.py`)
+3. Implement Step 4: Thumbnail creation & embedding using Pillow (reference FFmpeg `drawtext` parameters in `audio-tags-12d.py` for positioning/font/color)
 4. Implement Step 1: CSV preparation & structural validation (incorporating `match-audio-files.py`)
 5. Implement Step 5: Output validation & reporting
 6. Build pipeline orchestration
@@ -581,13 +581,13 @@ python hstl_audio.py batches
 
 - `audio-tags-12d.py` (v0.12d) is the proven prototype — extract logic into modules, don't rewrite
 - `match-audio-files.py` is a useful pre-flight utility to integrate into Step 1
-- **Mutagen** replaces FFmpeg for all metadata tag writing (Step 3); no audio re-encoding, fast
-- FFmpeg is still required for Step 4 thumbnail generation (drawtext filter overlays accession number on base PNG)
-- Step 4 remains a two-pass operation: pass 1 generates custom JPEG thumbnail, pass 2 embeds it into MP3
+- **Mutagen** handles all metadata tag writing (Step 3); no audio re-encoding, fast
+- **Pillow** handles Step 4 thumbnail generation (overlays accession number on base PNG using `ImageDraw`/`ImageFont`); no FFmpeg dependency
+- Step 4 is a single-pass pure-Python operation: Pillow generates JPEG in memory (`BytesIO`), Mutagen embeds it as `APIC` frame
 - Use `two.csv` (2 records) for rapid iteration during development
 - Full production dataset: 3,757 MP3 files in `LIST_HSTL-Audio-Files.csv`
 - Windows PowerShell/bash environment
 - Data directories separate from framework code location
 - CLI implementation first, GUI in Phase 2
 
-Updated: 2026-05-04
+Updated: 2026-05-04 (Step 4 thumbnail approach updated: Pillow replaces FFmpeg)
