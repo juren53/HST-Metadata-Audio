@@ -6,7 +6,7 @@ The HSTL Audio Framework is an application that orchestrates all components of t
 
 ## Repository Information
 
-- **GitHub Repository**: https://github.com/juren53/HST-Metadata
+- **GitHub Repository**: https://github.com/juren53/HST-Metadata-Audio
 - **Branch**: `master` (main branch)
 - **Local Repository**: `C:\Users\juren\Projects\HST-Metadata`
 - **Audio Project Path**: `Audio/`
