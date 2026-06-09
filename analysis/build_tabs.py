@@ -14,13 +14,16 @@ Tabs produced:
 """
 
 import re
+from datetime import datetime
 import pandas as pd
 from pathlib import Path
 
-BASE = Path(__file__).parent
+BASE      = Path(__file__).parent
+TIMESTAMP = datetime.now().strftime("%Y-%m-%d-%H%M")
+
 DRUPAL_CSV   = BASE / "HST-SRC_ALL_DrupalExport_2026-05-07_edited.csv"
 CATALOG_CSV  = BASE / "HST-SRC_ALL_catalog-export-20260507.csv"
-OUTPUT_XLSX  = BASE / "HST_Audio_Analysis.xlsx"
+OUTPUT_XLSX  = BASE / f"HST_Audio_Analysis_{TIMESTAMP}.xlsx"
 
 # ---------------------------------------------------------------------------
 # Load
