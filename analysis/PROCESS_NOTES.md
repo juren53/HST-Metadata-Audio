@@ -24,7 +24,7 @@ This analysis compares sound recording metadata from two sources — the NARA ca
 
 ## How the Script Works
 
-The script (`build_tabs.py`) is a Python script using `pandas` and `openpyxl`. It reads both CSVs, performs comparisons and transformations, and writes a single Excel file with seven named tabs.
+The script (`build_tabs.py`) is a Python script using `pandas` and `openpyxl`. It reads both CSVs, performs comparisons and transformations, and writes a single Excel file with eight named tabs.
 
 ### Key join logic
 
@@ -215,6 +215,67 @@ The Drupal `Date` field contains several formats. The parser handles:
 
 ---
 
+### Tab 8 — `Template_Matched` (812 rows)
+
+The 812 matched records (present in both Drupal and the NARA catalog) adapted to the bulk cataloging template columns for use as **catalog update records**. Because these records already exist in the catalog, the primary purpose of this tab is to supply the corrected and completed field values — most importantly the rebuilt `scopeAndContentNote` incorporating Production and Copyright data that was never migrated to the catalog.
+
+Helper columns (prefixed with `[...]`) are included for review, including `[Catalog_Title]` and `[Catalog_scopeAndContentNote]` to allow direct comparison with existing catalog values.
+
+**Note on the one duplicate NAID (325599974):** This NAID maps to two distinct physical items in Drupal (SR90-56-2 and SR90-56-3) but a single catalog record. Both Drupal rows are preserved in this tab; the shared catalog data populates both rows identically.
+
+#### Field mapping
+
+| Template column | Source | Notes |
+|---|---|---|
+| `naId` | Catalog / Drupal (join key) | Existing NAID — identifies the record being updated |
+| `dataControlGroup` | Catalog `dataControlGroup.groupName` | |
+| `collectionIdentifier` | Static | `HST-SRC` |
+| `parentSeries` | Static | `310670814` (Truman series NAID) |
+| `title` | Drupal `title` | Drupal is more accurate for published items; `[Catalog_Title]` helper included for comparison |
+| `generalRecordsType` | Static | `Sound Recordings` |
+| `copyStatus` | Catalog `physicalOccurrences.0.copyStatus` | Falls back to `Preservation-Reference` if blank |
+| `specificMediaType` | Catalog `physicalOccurrences.0.mediaOccurrences.0.specificMediaType` | Already structured in catalog; no lookup needed |
+| `generalMediaType` | Catalog `physicalOccurrences.0.mediaOccurrences.0.generalMediaTypes.0` | Already structured in catalog |
+| `dimensions` | Catalog `physicalOccurrences.0.mediaOccurrences.0.dimension` | Already structured; values: `16 inch`, `12 inch`, `10 inch`, `7 inch`, or blank |
+| `format` | *(blank)* | Not structured in catalog; not derivable from available fields |
+| `accessRestrictionStatus` | Catalog `accessRestriction.status` | All 811 matched catalog records are `Unrestricted` |
+| `useRestrictionStatus` | Catalog `useRestriction.status` | 808 `Unrestricted`; 3 `Restricted - Possibly` |
+| `specificUseRestriction` | Derived from `useRestriction.status` | Set to `Copyright` when status contains "restricted" |
+| `useRestrictionNote` | Catalog `useRestriction.note` | Passed through as-is from catalog |
+| `productionDateMonth` | Catalog `productionDates.0.month` | Already parsed in catalog; no date string processing needed |
+| `productionDateDay` | Catalog `productionDates.0.day` | Already parsed in catalog |
+| `productionDateYear` | Catalog `productionDates.0.year` | Already parsed in catalog |
+| `productionDateQualifier` | Parsed from Drupal `Date` string | Checks for `ca.` in Drupal date; catalog has no qualifier field |
+| `localIdentifier` | Catalog `localIdentifier` | |
+| `scopeAndContentNote` | Combined: Drupal `Description` + `Production and Copyright` | Key update — rebuilds scope note with P&C using same formula as Tab 7; `[Catalog_scopeAndContentNote]` helper included for comparison |
+| `[Description]` | Drupal `Description` | Helper column — source for scope note |
+| `[ProductionAndCopyright]` | Drupal `Production and Copyright` | Helper column — source for scope note |
+| `topicalSubject` | Catalog subjects with `authorityType = topicalSubject` | Authority-controlled; falls back to Drupal `Keywords` if none |
+| `geographicReference` | Catalog subjects with `authorityType = geographicPlaceName` | Authority-controlled; semicolon-joined when multiple |
+| `organizationalReference` | Catalog subjects with `authorityType = organization` | Authority-controlled; semicolon-joined when multiple |
+| `personalReference` | Catalog subjects with `authorityType = person` | Authority-controlled; falls back to Drupal `People Mentioned` if none |
+| `variantControlNumberType` | Catalog `variantControlNumbers.0.type` | |
+| `variantControlNumber` | Catalog `variantControlNumbers.0.number` | |
+| `variantControlNumberNote` | Catalog `variantControlNumbers.0.note` | |
+| `editStatus` | Drupal `Excerpt or Complete` | `Complete` → `N`; `Excerpt` → `Y`; blank → blank |
+| `recordingSpeed` | Drupal `Recording Speed` → speed lookup | Not structured in catalog; see recording speed lookup table in Tab 7 section |
+| `runningTime` | *(blank)* | Not in Drupal export or catalog |
+| `personalContributor` | Catalog contributor headings where `contributorType = Speaker` | All 841 contributor entries across matched records are Speaker type; semicolon-joined when multiple; falls back to Drupal `Speakers` if none |
+| `staffOnlyNote` | Combined: Drupal `Internal Note` + `Preservation` | Joined with ` \| ` separator |
+| `[InternalNote]` | Drupal `Internal Note` | Helper column |
+| `[PreservationNote]` | Drupal `Preservation` | Helper column |
+| `personalDonor` | *(blank)* | Not in Drupal export |
+| `organizationalDonor` | *(blank)* | Not in Drupal export |
+| `custodialHistoryNote` | Catalog `custodialHistoryNote` | Falls back to Drupal `Related Collection` prefixed formula if catalog value is blank |
+| `[RelatedCollection]` | Drupal `Related Collection` | Helper column |
+| `accessFilename` | Catalog `digitalObjects.0.objectFilename` | Falls back to filename extracted from Drupal `Sound Recording` URL if blank |
+| `[soundRecordingURL]` | Drupal `Sound Recording` | Helper column — full URL for reference |
+| `[Catalog_Title]` | Catalog `title` | Review helper — compare with `title` column to assess title updates needed |
+| `[Catalog_scopeAndContentNote]` | Catalog `scopeAndContentNote` | Review helper — compare with rebuilt `scopeAndContentNote` |
+| `[Drupal_AccessionNumber]` | Drupal `Accession Number` | Review helper — compare with `localIdentifier` from catalog |
+
+---
+
 ## Counts Summary
 
 | Tab | Rows |
@@ -226,15 +287,18 @@ The Drupal `Date` field contains several formats. The parser handles:
 | Catalog_Only | 27 |
 | Drupal_NoNAID_Published | 181 |
 | Template_Mapped | 181 |
+| Template_Matched | 812 |
 
 ---
 
 ## Known Limitations and Items Requiring Manual Review
 
-- **Title mismatches (597 records):** The high count likely includes many minor formatting differences (punctuation, capitalization, abbreviations). A manual spot-check of the `Title_Mismatch` tab is recommended before deciding on a batch update strategy.
+- **Title mismatches (597 records):** The high count likely includes many minor formatting differences (punctuation, capitalization, abbreviations). A manual spot-check of the `Title_Mismatch` tab is recommended before deciding on a batch update strategy. The `[Catalog_Title]` helper column in `Template_Matched` supports this review.
 - **Blank formats (12 records):** Twelve records in `Template_Mapped` have no `Original Format(s)` value. `specificMediaType`, `generalMediaType`, `dimensions`, and `format` will need to be filled in manually.
-- **Organizational reference:** No clear Drupal source field maps to `organizationalReference`. Review `Keywords` and `HST Keywords` columns in `Drupal_NoNAID_Published` for candidates.
-- **Running time:** Not present in the Drupal export. Left blank in `Template_Mapped`.
-- **Personal/Organizational Donor:** Not present in the Drupal export. Left blank.
+- **`format` field in Template_Matched:** The catalog does not have a standalone `format` field equivalent to the template column. Left blank for all 812 records.
+- **Organizational reference:** No clear Drupal source field maps to `organizationalReference` in `Template_Mapped` (no-NAID records). In `Template_Matched`, catalog authority-controlled organization subjects are used.
+- **Running time:** Not present in either source. Left blank in both template tabs.
+- **Personal/Organizational Donor:** Not present in either source. Left blank in both template tabs.
 - **Template version:** The bulk cataloging template used (`LAA_2ndDraft_SoundRec_Template-BulkVer10-19-23.xlsx`) is described as a work in progress. Column mappings may need to be updated when a final version is available.
-- **parentSeries NAID:** Hardcoded to `310670814` (Truman series). If any records belong to a non-Truman series, this will need to be corrected per record.
+- **parentSeries NAID:** Hardcoded to `310670814` (Truman series) in both template tabs. If any records belong to a non-Truman series, this will need to be corrected per record.
+- **Duplicate NAID 325599974:** Appears twice in `Template_Matched` (Drupal records SR90-56-2 and SR90-56-3 share one catalog record). Both rows are intentionally retained.
