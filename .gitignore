@@ -2,3 +2,6 @@ testing/
 processed/
 Test-mp3s/
 post-processed/
+
+# Timestamped analysis outputs (keep script and PROCESS_NOTES, not output runs)
+analysis/HST_Audio_Analysis_*.xlsx
