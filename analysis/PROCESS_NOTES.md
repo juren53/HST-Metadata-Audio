@@ -1,6 +1,6 @@
 # HST Audio Metadata Analysis — Process Notes
 
-**Date:** 2026-06-08  
+**Date:** 2026-06-08-2026  
 **Script:** `build_tabs.py`  
 **Output:** `HST_Audio_Analysis.xlsx`
 
