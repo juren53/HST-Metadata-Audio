@@ -199,9 +199,9 @@ Production and Copyright info:
 
 If `Production and Copyright` is blank, the scope note is just the `Description` text.
 
-#### Date parsing
+#### Date handling (Tab 7 — no-NAID records only)
 
-The Drupal `Date` field contains several formats. The parser handles:
+These records have no catalog entry, so all date information must be parsed from the Drupal `Date` free-text field. The parser handles:
 
 | Date format in Drupal | Example | Handling |
 |---|---|---|
@@ -273,6 +273,19 @@ Helper columns (prefixed with `[...]`) are included for review, including `[Cata
 | `[Catalog_Title]` | Catalog `title` | Review helper — compare with `title` column to assess title updates needed |
 | `[Catalog_scopeAndContentNote]` | Catalog `scopeAndContentNote` | Review helper — compare with rebuilt `scopeAndContentNote` |
 | `[Drupal_AccessionNumber]` | Drupal `Accession Number` | Review helper — compare with `localIdentifier` from catalog |
+
+#### Date handling (Tab 8 — matched records)
+
+Because matched records already exist in the NARA catalog, the catalog's pre-parsed date fields are used directly for month, day, and year — no string parsing is required for those three fields. The qualifier, however, is not captured in the catalog export and must still be derived from the Drupal `Date` string.
+
+| Template field | Source | Detail |
+|---|---|---|
+| `productionDateMonth` | Catalog `productionDates.0.month` | Integer month as stored in NARA (e.g., `4` for April) |
+| `productionDateDay` | Catalog `productionDates.0.day` | Integer day; blank when only year or year+month is known |
+| `productionDateYear` | Catalog `productionDates.0.year` | 4-digit year |
+| `productionDateQualifier` | Parsed from Drupal `Date` string | Catalog has no qualifier field. The Drupal `Date` string is checked for `ca.`; if found, qualifier is set to `ca.` and removed from the date value. See date parsing table in Tab 7 section for all Drupal date formats handled. |
+
+The catalog also exports `productionDates.0.logicalDate` (a pre-formatted display string such as `4/27/1940`), but this field is not used in the template output since the individual structured fields are already available and more suitable for bulk submission.
 
 ---
 
