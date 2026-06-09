@@ -10,6 +10,7 @@ Tabs produced:
   5. Catalog_Only            - catalog records with no matching Drupal NAID
   6. Drupal_NoNAID_Published - Drupal published records (has Sound Recording URL) with no NAID
   7. Template_Mapped         - published/no-NAID records adapted to bulk cataloging template columns
+  8. Template_Matched        - matched records adapted to template columns for catalog updates
 """
 
 import re
@@ -174,12 +175,8 @@ published_no_naid = (
 print(f"Drupal published/no-NAID: {len(published_no_naid)}")
 
 # ---------------------------------------------------------------------------
-# Tab 7 — Template_Mapped
-# Adapts published/no-NAID Drupal records to bulk cataloging template columns.
-# Column order matches Template-Bulk row 1 from LAA_2ndDraft_SoundRec_Template.
+# Shared lookup tables and helper functions (used by Tab 7 and Tab 8)
 # ---------------------------------------------------------------------------
-
-# --- Lookup tables from template sheets ---
 
 # Format Mapping: Drupal "Original Format(s)" → template fields
 # generalMediaType inferred from NARA catalog data (all legacy audio = Magnetic Media
@@ -307,6 +304,176 @@ def extract_filename(url):
     return ""
 
 
+# ---------------------------------------------------------------------------
+# Tab 8 — Template_Matched
+# Adapts matched records to template columns for catalog updates.
+# Uses catalog's pre-structured fields (dates, media types, subjects, contributors)
+# and Drupal fields for data not captured in the catalog (title, P&C, recording speed).
+# ---------------------------------------------------------------------------
+
+_CATALOG_COLS = set(catalog_matched.columns)
+
+def _cget(row, col):
+    return row[col] if col in _CATALOG_COLS else ""
+
+def collect_speakers(c_row):
+    """Return semicolon-joined Speaker contributor headings from catalog row."""
+    parts = []
+    for i in range(15):
+        if _cget(c_row, f"contributors.{i}.contributorType").strip() == "Speaker":
+            h = _cget(c_row, f"contributors.{i}.heading").strip()
+            if h:
+                parts.append(h)
+    return "; ".join(parts)
+
+def collect_subjects_by_type(c_row, auth_type):
+    """Return semicolon-joined subject headings matching a given authorityType."""
+    parts = []
+    for i in range(8):
+        if _cget(c_row, f"subjects.{i}.authorityType").strip() == auth_type:
+            h = _cget(c_row, f"subjects.{i}.heading").strip()
+            if h and h not in parts:
+                parts.append(h)
+    return "; ".join(parts)
+
+def derive_specific_use_restriction(use_status, use_note):
+    """Map catalog useRestriction.status to specificUseRestriction value."""
+    s = use_status.strip().lower()
+    if "restricted" in s:
+        return "Copyright"
+    return ""
+
+# Index catalog by naId for O(1) lookup; keep first row where duplicates exist
+catalog_idx = catalog_matched.set_index("_naid", drop=False)
+
+# Merge so each Drupal row (including the one duplicate) gets its catalog row
+matched_for_template = drupal_matched.merge(
+    catalog_matched[["_naid"]],  # just the key; we'll look up catalog via index
+    on="_naid",
+    how="left",
+)
+
+rows_t8 = []
+for _, d in drupal_matched.iterrows():
+    naid = d["_naid"]
+    c = catalog_idx.loc[naid] if naid in catalog_idx.index else pd.Series(dtype=str)
+
+    # --- Catalog fields ---
+    specific_media = _cget(c, "physicalOccurrences.0.mediaOccurrences.0.specificMediaType").strip()
+    general_media  = _cget(c, "physicalOccurrences.0.mediaOccurrences.0.generalMediaTypes.0").strip()
+    dimensions     = _cget(c, "physicalOccurrences.0.mediaOccurrences.0.dimension").strip()
+    copy_status    = _cget(c, "physicalOccurrences.0.copyStatus").strip() or "Preservation-Reference"
+    access_status  = _cget(c, "accessRestriction.status").strip() or "Unrestricted"
+    use_status     = _cget(c, "useRestriction.status").strip() or "Unrestricted"
+    use_note       = _cget(c, "useRestriction.note").strip()
+    specific_use   = derive_specific_use_restriction(use_status, use_note)
+    prod_month     = _cget(c, "productionDates.0.month").strip()
+    prod_day       = _cget(c, "productionDates.0.day").strip()
+    prod_year      = _cget(c, "productionDates.0.year").strip()
+    local_id       = _cget(c, "localIdentifier").strip()
+    catalog_scope  = _cget(c, "scopeAndContentNote").strip()
+    catalog_title  = _cget(c, "title").strip()
+    vcn_type       = _cget(c, "variantControlNumbers.0.type").strip()
+    vcn_num        = _cget(c, "variantControlNumbers.0.number").strip()
+    vcn_note       = _cget(c, "variantControlNumbers.0.note").strip()
+    custodial      = _cget(c, "custodialHistoryNote").strip()
+    access_file    = _cget(c, "digitalObjects.0.objectFilename").strip()
+    dg_group       = _cget(c, "dataControlGroup.groupName").strip() or "PL-HST"
+
+    # Subjects routed by authorityType
+    geo_ref  = collect_subjects_by_type(c, "geographicPlaceName")
+    org_ref  = collect_subjects_by_type(c, "organization")
+    pers_ref = collect_subjects_by_type(c, "person") or d.get("People Mentioned", "").strip()
+    topic    = collect_subjects_by_type(c, "topicalSubject") or d.get("Keywords", "").strip()
+    speakers = collect_speakers(c) or d.get("Speakers", "").strip()
+
+    # --- Drupal fields ---
+    drupal_title = d.get("title", "").strip()
+    description  = d.get("Description", "").strip()
+    prod_copy    = d.get("Production and Copyright", "").strip()
+    scope_note   = build_scope_note(description, prod_copy)
+
+    # Qualifier: check Drupal Date string for "ca."
+    _, _, _, qualifier = parse_date(d.get("Date", ""))
+
+    # Recording speed: not in catalog — use Drupal
+    speed_raw = d.get("Recording Speed", "").strip()
+    speed = SPEED_MAP.get(speed_raw, speed_raw)
+
+    # EditStatus from Drupal Excerpt or Complete
+    excerpt_map = {"Complete": "N", "Excerpt": "Y"}
+    edit_status = excerpt_map.get(d.get("Excerpt or Complete", "").strip(), "")
+
+    # StaffOnlyNote from Drupal
+    staff_note = build_staff_note(d.get("Internal Note", ""), d.get("Preservation", ""))
+
+    # Custodial: prefer catalog; fall back to Drupal Related Collection
+    if not custodial:
+        custodial = build_custodial_note(d.get("Related Collection", ""))
+
+    # Access filename: prefer catalog object filename, fall back to URL
+    if not access_file:
+        access_file = extract_filename(d.get("Sound Recording", ""))
+
+    rows_t8.append({
+        "naId":                     naid,
+        "dataControlGroup":         dg_group,
+        "collectionIdentifier":     "HST-SRC",
+        "parentSeries":             "310670814",
+        "title":                    drupal_title,
+        "generalRecordsType":       "Sound Recordings",
+        "copyStatus":               copy_status,
+        "specificMediaType":        specific_media,
+        "generalMediaType":         general_media,
+        "accessRestrictionStatus":  access_status,
+        "useRestrictionStatus":     use_status,
+        "specificUseRestriction":   specific_use,
+        "useRestrictionNote":       use_note,
+        "productionDateMonth":      prod_month,
+        "productionDateDay":        prod_day,
+        "productionDateYear":       prod_year,
+        "productionDateQualifier":  qualifier,
+        "localIdentifier":          local_id,
+        "scopeAndContentNote":      scope_note,
+        "[Description]":            description,
+        "[ProductionAndCopyright]": prod_copy,
+        "topicalSubject":           topic,
+        "geographicReference":      geo_ref,
+        "organizationalReference":  org_ref,
+        "personalReference":        pers_ref,
+        "variantControlNumberType": vcn_type,
+        "variantControlNumber":     vcn_num,
+        "variantControlNumberNote": vcn_note,
+        "editStatus":               edit_status,
+        "dimensions":               dimensions,
+        "format":                   "",
+        "recordingSpeed":           speed,
+        "runningTime":              "",
+        "personalContributor":      speakers,
+        "staffOnlyNote":            staff_note,
+        "[InternalNote]":           d.get("Internal Note", "").strip(),
+        "[PreservationNote]":       d.get("Preservation", "").strip(),
+        "personalDonor":            "",
+        "organizationalDonor":      "",
+        "custodialHistoryNote":     custodial,
+        "[RelatedCollection]":      d.get("Related Collection", "").strip(),
+        "accessFilename":           access_file,
+        "[soundRecordingURL]":      d.get("Sound Recording", "").strip(),
+        # Review helpers
+        "[Catalog_Title]":          catalog_title,
+        "[Catalog_scopeAndContentNote]": catalog_scope,
+        "[Drupal_AccessionNumber]": d.get("Accession Number", "").strip(),
+    })
+
+template_matched = pd.DataFrame(rows_t8).sort_values("naId").reset_index(drop=True)
+print(f"Template_Matched rows : {len(template_matched)}")
+
+# ---------------------------------------------------------------------------
+# Tab 7 — Template_Mapped
+# Adapts published/no-NAID Drupal records to bulk cataloging template columns.
+# Column order matches Template-Bulk row 1 from LAA_2ndDraft_SoundRec_Template.
+# ---------------------------------------------------------------------------
+
 # --- Build Template_Mapped dataframe ---
 src = published_no_naid.copy()
 
@@ -398,6 +565,7 @@ tab_counts = {
     "Catalog_Only":            len(catalog_only_out),
     "Drupal_NoNAID_Published": len(published_no_naid),
     "Template_Mapped":         len(template_mapped),
+    "Template_Matched":        len(template_matched),
 }
 
 with pd.ExcelWriter(OUTPUT_XLSX, engine="openpyxl") as writer:
@@ -408,6 +576,7 @@ with pd.ExcelWriter(OUTPUT_XLSX, engine="openpyxl") as writer:
     catalog_only_out.to_excel(   writer, sheet_name="Catalog_Only",            index=False)
     published_no_naid.to_excel(  writer, sheet_name="Drupal_NoNAID_Published", index=False)
     template_mapped.to_excel(    writer, sheet_name="Template_Mapped",         index=False)
+    template_matched.to_excel(   writer, sheet_name="Template_Matched",        index=False)
 
     # Auto-fit column widths (capped at 60)
     for sheet_name, ws in writer.sheets.items():
