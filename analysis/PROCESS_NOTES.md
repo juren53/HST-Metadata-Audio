@@ -8,7 +8,11 @@
 
 ## Overview
 
-This analysis compares sound recording metadata from two sources — the NARA catalog and the Truman Library's Drupal website — to identify discrepancies, prepare catalog updates, and adapt unpublished-in-catalog records for bulk cataloging submission.
+This analysis compares sound recording metadata from two sources — the NARA catalog and the Truman Library's Drupal website — to identify discrepancies, prepare catalog updates, and adapt unpublished-in-catalog records for bulk cataloging submission. The output workbook contains eight tabs organized around two goals:
+
+**Comparison and cleanup (Tabs 1–5):** Side-by-side analysis of the 812 records present in both sources, surfacing differences in titles, accession numbers, and descriptions, plus the 27 records that exist in the catalog but not in Drupal.
+
+**Catalog submissions and updates (Tabs 6–8):** The 181 Drupal records published online but not yet in the NARA catalog (Tab 6), mapped to the bulk cataloging template for new submissions (Tab 7); and the 812 matched records mapped to the same template format for catalog updates, with rebuilt scope notes incorporating Production and Copyright data that was never migrated (Tab 8).
 
 ---
 
