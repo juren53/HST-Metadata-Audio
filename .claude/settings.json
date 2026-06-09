@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r '.tool_input.file_path // \"\"' | grep -q 'PROCESS_NOTES\\.md$' && pandoc \"C:/Users/juren/Projects/HST-Metadata/Audio/analysis/PROCESS_NOTES.md\" -o \"C:/Users/juren/Projects/HST-Metadata/Audio/analysis/PROCESS_NOTES.docx\" --from markdown --to docx 2>/dev/null || true",
+            "statusMessage": "Regenerating PROCESS_NOTES.docx..."
+          }
+        ]
+      }
+    ]
+  }
+}
