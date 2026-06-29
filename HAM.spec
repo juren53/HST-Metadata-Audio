@@ -26,6 +26,11 @@ hiddenimports = [
     'theme_manager.core',
     'theme_manager.dialog',
     'icon_loader',
+    # pyqt-app-info
+    'pyqt_app_info',
+    'pyqt_app_info.qt',
+    'pyqt_app_info.info',
+    'pyqt_app_info.tools',
     # HAM packages
     '__init__',
     'gui',

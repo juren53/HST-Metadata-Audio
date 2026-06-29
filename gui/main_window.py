@@ -33,6 +33,8 @@ from gui.widgets.log_widget import LogWidget
 from gui.dialogs.new_batch_dialog import NewBatchDialog
 from gui.theme import DEFAULT_THEME, get_theme_registry, get_fusion_palette, is_dark_theme
 from gui.zoom_manager import ZoomManager
+from pyqt_app_info import AppIdentity, ToolRegistry, gather_info
+from pyqt_app_info.qt import AboutDialog
 
 
 _logger = get_logger("ham-gui")
@@ -425,16 +427,26 @@ class MainWindow(QMainWindow):
                                 f"URL: {url}\n\nError: {e}")
 
     def _show_about(self):
-        QMessageBox.about(
-            self,
-            f"About {__short_name__}",
-            f"<b>{__app_name__}</b> v{__version__}<br>"
-            f"Build date: {__commit_date__}<br><br>"
-            "An end-to-end framework for embedding metadata into HSTL sound recordings.<br>"
-            "Processes CSV metadata through 5 steps to produce tagged MP3 files<br>"
-            "with custom album art thumbnails.<br><br>"
-            "Harry S. Truman Presidential Library &amp; Museum",
+        identity = AppIdentity(
+            name=__app_name__,
+            short_name=__short_name__,
+            version=__version__,
+            commit_date=__commit_date__,
+            description=(
+                "An end-to-end framework for embedding archival metadata into MP3 "
+                "sound recordings from the Harry S. Truman Presidential Library (HSTL) "
+                "for submission to the NARA catalog."
+            ),
+            features=[
+                "Multi-batch management with progress tracking",
+                "CSV preparation and MP3/CSV filename matching (Step 1)",
+                "ID3v2.3 metadata tag embedding via Mutagen (Step 3)",
+                "Album art generation and embedding via Pillow (Step 4)",
+                "Output validation and reporting (Step 5)",
+            ],
         )
+        info = gather_info(identity, registry=ToolRegistry(), caller_file=__file__)
+        AboutDialog(info, parent=self).exec()
 
     # ──────────────────────────────────────────────────────────────────────
     # Window state

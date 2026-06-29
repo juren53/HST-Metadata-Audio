@@ -4,3 +4,4 @@ PyYAML>=6.0
 PyQt6>=6.6.0
 colorama>=0.4.6
 tqdm>=4.66.0
+pyqt-app-info[qt]>=0.1.0
