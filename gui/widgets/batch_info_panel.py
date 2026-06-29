@@ -9,7 +9,7 @@ from pathlib import Path
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QFormLayout, QLabel,
-    QPushButton, QGroupBox, QFrame, QSizePolicy,
+    QPushButton, QGroupBox, QSizePolicy,
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QDesktopServices
@@ -17,14 +17,6 @@ from PyQt6.QtCore import QUrl
 
 from config.config_manager import ConfigManager
 from utils.path_manager import PathManager
-
-_STEP_LABELS = {
-    1: "CSV Preparation & Validation",
-    2: "CSV Validation & Date Conversion",
-    3: "Metadata Tag Embedding",
-    4: "Album Art Embedding",
-    5: "Output Validation & Reporting",
-}
 
 
 class BatchInfoPanel(QWidget):
@@ -80,22 +72,10 @@ class BatchInfoPanel(QWidget):
     def _build_pipeline_group(self) -> QGroupBox:
         group = QGroupBox("Pipeline Progress")
         vbox = QVBoxLayout(group)
-        vbox.setSpacing(4)
 
         self._progress_summary = QLabel("No batch selected")
         self._progress_summary.setStyleSheet("font-weight: bold;")
         vbox.addWidget(self._progress_summary)
-
-        sep = QFrame()
-        sep.setFrameShape(QFrame.Shape.HLine)
-        vbox.addWidget(sep)
-
-        self._step_labels: dict[int, QLabel] = {}
-        for i in range(1, 6):
-            lbl = QLabel(f"Step {i}:  ○ Pending  —  {_STEP_LABELS[i]}")
-            lbl.setWordWrap(True)
-            self._step_labels[i] = lbl
-            vbox.addWidget(lbl)
 
         return group
 
@@ -155,19 +135,10 @@ class BatchInfoPanel(QWidget):
         self._dir_val.setText(data_dir_str or "—")
         self._open_btn.setEnabled(bool(self._data_dir and self._data_dir.exists()))
 
-        # Per-step completion
-        done_count = 0
-        if config:
-            for i in range(1, 6):
-                is_done = config.get_step_status(i)
-                lbl = self._step_labels[i]
-                if is_done:
-                    lbl.setText(f"Step {i}:  ✓ Done  —  {_STEP_LABELS[i]}")
-                    lbl.setStyleSheet("color: #4caf50;")
-                    done_count += 1
-                else:
-                    lbl.setText(f"Step {i}:  ○ Pending  —  {_STEP_LABELS[i]}")
-                    lbl.setStyleSheet("")
+        # Step completion summary
+        done_count = sum(
+            1 for i in range(1, 6) if config and config.get_step_status(i)
+        )
         self._progress_summary.setText(f"{done_count} of 5 steps complete")
 
         # File counts
@@ -180,9 +151,6 @@ class BatchInfoPanel(QWidget):
                     self._csv_name_val, self._csv_size_val, self._mp3_count_val):
             lbl.setText("—")
         self._progress_summary.setText("No batch selected")
-        for i, lbl in self._step_labels.items():
-            lbl.setText(f"Step {i}:  ○ Pending  —  {_STEP_LABELS[i]}")
-            lbl.setStyleSheet("")
         self._open_btn.setEnabled(False)
         self._data_dir = None
 
