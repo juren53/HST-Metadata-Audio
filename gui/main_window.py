@@ -381,17 +381,10 @@ class MainWindow(QMainWindow):
         )
 
     def _show_changelog(self):
-        import os
-        log = _ROOT / "CHANGELOG.md"
-        fallback = "https://github.com/juren53/HST-Metadata/tree/master/Audio"
-        if log.exists():
-            try:
-                os.startfile(str(log)) if os.name == "nt" else None
-                self.status_bar.showMessage("Opening Change Log…", 2000)
-                return
-            except Exception:
-                pass
-        self._open_url(fallback, "Change Log")
+        self._open_url(
+            "https://github.com/juren53/HST-Metadata-Audio/blob/master/CHANGELOG.md",
+            "Change Log",
+        )
 
     def _show_issue_tracker(self):
         self._open_url("https://github.com/juren53/HST-Metadata/issues", "Issue Tracker")
