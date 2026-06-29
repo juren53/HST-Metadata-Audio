@@ -65,7 +65,7 @@ class BatchInfoPanel(QWidget):
 
         self._name_val     = _val()
         self._id_val       = _val()
-        self._id_val.setStyleSheet("font-family: monospace; font-size: 10px;")
+        self._id_val.setStyleSheet("font-family: monospace;")
         self._status_val   = _val()
         self._created_val  = _val()
         self._accessed_val = _val()
@@ -127,7 +127,7 @@ class BatchInfoPanel(QWidget):
 
         self._dir_val = QLabel("—")
         self._dir_val.setWordWrap(True)
-        self._dir_val.setStyleSheet("font-family: monospace; font-size: 10px;")
+        self._dir_val.setStyleSheet("font-family: monospace;")
 
         self._open_btn = QPushButton("Open Folder")
         self._open_btn.setFixedWidth(110)
