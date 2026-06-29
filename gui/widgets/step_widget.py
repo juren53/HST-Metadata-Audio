@@ -9,7 +9,7 @@ STUB – UI skeleton implemented; step execution hooks are placeholders.
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-    QPushButton, QGroupBox, QProgressBar, QFrame,
+    QPushButton, QGroupBox, QProgressBar, QFrame, QSizePolicy,
 )
 from PyQt6.QtCore import pyqtSignal, Qt
 
@@ -22,6 +22,8 @@ _STEP_LABELS = {
     4: "Thumbnail Creation & Embedding",
     5: "Output Validation & Reporting",
 }
+
+_CONTENT_MAX_WIDTH = 720
 
 
 class StepWidget(QWidget):
@@ -39,7 +41,17 @@ class StepWidget(QWidget):
         self._init_ui()
 
     def _init_ui(self):
-        layout = QVBoxLayout(self)
+        # Outer layout centres the content column horizontally
+        outer = QHBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+
+        content = QWidget()
+        content.setMaximumWidth(_CONTENT_MAX_WIDTH)
+        content.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
+
+        layout = QVBoxLayout(content)
+        layout.setContentsMargins(12, 16, 12, 16)
+        layout.setSpacing(8)
 
         self.batch_label = QLabel("No batch selected")
         self.batch_label.setStyleSheet("font-weight: bold; font-size: 14px;")
@@ -55,32 +67,37 @@ class StepWidget(QWidget):
         layout.addWidget(line)
 
         for step_num in range(1, 6):
-            row = self._build_step_row(step_num)
-            layout.addWidget(row)
+            layout.addWidget(self._build_step_row(step_num))
 
         layout.addStretch()
 
-        # Run All button
         run_all_btn = QPushButton("Run All Steps (from next incomplete)")
+        run_all_btn.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         run_all_btn.clicked.connect(self._run_all)
-        layout.addWidget(run_all_btn)
+        layout.addWidget(run_all_btn, alignment=Qt.AlignmentFlag.AlignLeft)
+
+        outer.addStretch()
+        outer.addWidget(content)
+        outer.addStretch()
 
     def _build_step_row(self, step_num: int) -> QGroupBox:
         group = QGroupBox(f"Step {step_num}: {_STEP_LABELS[step_num]}")
-        row_layout = QHBoxLayout(group)
+        row = QHBoxLayout(group)
+        row.setContentsMargins(8, 6, 8, 6)
 
         status_lbl = QLabel("○ Pending")
-        status_lbl.setMinimumWidth(100)
+        status_lbl.setFixedWidth(100)
         self._step_status[step_num] = status_lbl
 
         run_btn = QPushButton(f"Run Step {step_num}")
+        run_btn.setFixedWidth(110)
         run_btn.clicked.connect(lambda checked=False, n=step_num: self._run_step(n))
         run_btn.setEnabled(False)
         self._step_btns[step_num] = run_btn
 
-        row_layout.addWidget(status_lbl)
-        row_layout.addStretch()
-        row_layout.addWidget(run_btn)
+        row.addWidget(status_lbl)
+        row.addStretch()
+        row.addWidget(run_btn)
         return group
 
     # ──────────────────────────────────────────────────────────────────────
@@ -105,8 +122,8 @@ class StepWidget(QWidget):
             is_done = self.config.get_step_status(step_num)
             lbl = self._step_status[step_num]
             if is_done:
-                lbl.setText("✓ Complete")
-                lbl.setStyleSheet("color: green;")
+                lbl.setText("done")
+                lbl.setStyleSheet("color: #4caf50; font-weight: bold;")
                 done_count += 1
             else:
                 lbl.setText("○ Pending")
@@ -125,7 +142,6 @@ class StepWidget(QWidget):
         from utils.path_manager import PathManager
         from steps.base_step import ProcessingContext
         from utils.logger import get_logger
-        from core.pipeline import Pipeline
         from steps.step1_csv_prep import Step1_CSVPrep
         from steps.step2_csv_validation import Step2_CSVValidation
         from steps.step3_metadata_embed import Step3_MetadataEmbed
