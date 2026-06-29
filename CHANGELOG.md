@@ -35,7 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## HAM [0.1.3] - 2026-06-29 1700 CDT
+## HAM [0.1.3] - 2026-06-29 1040 CDT
 
 ### Added
 - **`run.ps1`** — PowerShell launcher; auto-creates `.venv`, installs
@@ -57,7 +57,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## HAM [0.1.2] - 2026-06-29 1500 CDT
+## HAM [0.1.2] - 2026-06-29 0948 CDT
 
 ### Added
 - **ZoomManager** (`gui/zoom_manager.py`) — singleton font-scaling manager; mirrors
@@ -73,7 +73,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## HAM [0.1.1] - 2026-06-29 1300 CDT
+## HAM [0.1.1] - 2026-06-29 0940 CDT
 
 ### Added
 - **ThemeManager integration** (`gui/theme.py`) — wires `~/Projects/ThemeManager`
