@@ -171,6 +171,11 @@ class MainWindow(QMainWindow):
 
         # Help
         help_menu = mb.addMenu("&Help")
+        self._add_action(help_menu, "&User Guide", self._show_user_guide, "F1")
+        self._add_action(help_menu, "&Change Log", self._show_changelog)
+        help_menu.addSeparator()
+        self._add_action(help_menu, "HAM &Issue Tracker", self._show_issue_tracker)
+        help_menu.addSeparator()
         self._add_action(help_menu, "&About", self._show_about)
 
     def _add_action(self, menu, label, slot, shortcut=None):
@@ -368,6 +373,53 @@ class MainWindow(QMainWindow):
             event.accept()
         else:
             super().wheelEvent(event)
+
+    def _show_user_guide(self):
+        import os
+        guide = _ROOT / "docs" / "HSTL_Audio_Framework-Development_Plan.md"
+        fallback = "https://github.com/juren53/HST-Metadata/tree/master/Audio/docs"
+        if guide.exists():
+            try:
+                os.startfile(str(guide)) if os.name == "nt" else None
+                self.status_bar.showMessage("Opening User Guide…", 2000)
+                return
+            except Exception:
+                pass
+        self._open_url(fallback, "User Guide")
+
+    def _show_changelog(self):
+        import os
+        log = _ROOT / "CHANGELOG.md"
+        fallback = "https://github.com/juren53/HST-Metadata/tree/master/Audio"
+        if log.exists():
+            try:
+                os.startfile(str(log)) if os.name == "nt" else None
+                self.status_bar.showMessage("Opening Change Log…", 2000)
+                return
+            except Exception:
+                pass
+        self._open_url(fallback, "Change Log")
+
+    def _show_issue_tracker(self):
+        self._open_url("https://github.com/juren53/HST-Metadata/issues", "Issue Tracker")
+
+    def _open_url(self, url: str, label: str):
+        import webbrowser
+        from PyQt6.QtGui import QDesktopServices
+        from PyQt6.QtCore import QUrl
+        try:
+            if QDesktopServices.openUrl(QUrl(url)):
+                self.status_bar.showMessage(f"Opening {label}…", 2000)
+                return
+        except Exception:
+            pass
+        try:
+            webbrowser.open(url)
+            self.status_bar.showMessage(f"Opening {label}…", 2000)
+        except Exception as e:
+            QMessageBox.warning(self, f"Cannot Open {label}",
+                                f"Could not open {label} in browser.\n\n"
+                                f"URL: {url}\n\nError: {e}")
 
     def _show_about(self):
         QMessageBox.about(
