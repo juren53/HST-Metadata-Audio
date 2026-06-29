@@ -5,7 +5,7 @@ New Batch Dialog for HAM GUI.
 from pathlib import Path
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QFormLayout, QLineEdit,
-    QPushButton, QHBoxLayout, QFileDialog, QDialogButtonBox, QLabel,
+    QPushButton, QHBoxLayout, QFileDialog, QDialogButtonBox, QLabel, QMessageBox,
 )
 
 
@@ -51,7 +51,19 @@ class NewBatchDialog(QDialog):
     _DEFAULT_DIR = r"C:\Data\HSTL_Audio_Batches"
 
     def _browse(self):
-        start = self._DEFAULT_DIR if Path(self._DEFAULT_DIR).exists() else ""
+        default = Path(self._DEFAULT_DIR)
+        if not default.exists():
+            reply = QMessageBox.question(
+                self, "Create Directory?",
+                f"{self._DEFAULT_DIR} does not exist.\n\nCreate it now?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            )
+            if reply == QMessageBox.StandardButton.Yes:
+                try:
+                    default.mkdir(parents=True, exist_ok=True)
+                except Exception as e:
+                    QMessageBox.warning(self, "Error", f"Could not create directory:\n{e}")
+        start = str(default) if default.exists() else ""
         folder = QFileDialog.getExistingDirectory(self, "Select Data Directory", start)
         if folder:
             self.dir_edit.setText(folder)
