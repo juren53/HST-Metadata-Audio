@@ -12,7 +12,7 @@ Metadata is written using **[Mutagen](https://mutagen.readthedocs.io/)** — a p
 
 | Step | Name | Status |
 |---|---|---|
-| 1 | CSV Preparation & Validation | Stub |
+| 1 | CSV Preparation & Validation | Implemented |
 | 2 | CSV Validation & Date Conversion | Implemented |
 | 3 | Metadata Tag Embedding | Implemented |
 | 4 | Album Art Embedding | Stub |
@@ -83,7 +83,7 @@ Audio/
 │   └── pipeline.py            # Step orchestrator
 ├── steps/
 │   ├── base_step.py           # StepProcessor ABC
-│   ├── step1_csv_prep.py      # Stub
+│   ├── step1_csv_prep.py      # CSV prep & MP3 matching
 │   ├── step2_csv_validation.py
 │   ├── step3_metadata_embed.py
 │   ├── step4_thumbnail_embed.py  # Stub
