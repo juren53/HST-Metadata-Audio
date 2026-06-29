@@ -375,17 +375,10 @@ class MainWindow(QMainWindow):
             super().wheelEvent(event)
 
     def _show_user_guide(self):
-        import os
-        guide = _ROOT / "docs" / "HSTL_Audio_Framework-Development_Plan.md"
-        fallback = "https://github.com/juren53/HST-Metadata/tree/master/Audio/docs"
-        if guide.exists():
-            try:
-                os.startfile(str(guide)) if os.name == "nt" else None
-                self.status_bar.showMessage("Opening User Guide…", 2000)
-                return
-            except Exception:
-                pass
-        self._open_url(fallback, "User Guide")
+        self._open_url(
+            "https://github.com/juren53/HST-Metadata-Audio/blob/master/README.md",
+            "User Guide",
+        )
 
     def _show_changelog(self):
         import os
