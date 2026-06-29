@@ -11,6 +11,70 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## HAM [0.1.0] - 2026-06-29 1200 CDT
+
+### Added
+- **Full framework scaffold** — Phase 1 CLI and Phase 2 GUI skeleton, structured after HPM
+  (HSTL Photo Metadata Framework):
+
+  **Core infrastructure (fully functional):**
+  - `__init__.py` — version string (`0.1.0`), app name constants
+  - `config/config_manager.py` — YAML-backed ConfigManager with dot-notation get/set,
+    5-step status tracking, config validation
+  - `config/settings.py` — DEFAULT_SETTINGS dict, REQUIRED_CSV_COLUMNS list
+  - `utils/validator.py` — ValidationResult dataclass (errors, warnings, merge)
+  - `utils/path_manager.py` — PathManager; all batch directory paths in one place
+  - `utils/logger.py` — HAMLogger with SUCCESS level, colour console output, file handler
+  - `utils/file_utils.py` — safe_copy, count_mp3s, list_mp3s, open_in_explorer
+  - `utils/batch_registry.py` — BatchRegistry YAML store; full CRUD + lifecycle management
+  - `steps/base_step.py` — StepProcessor ABC, ProcessingContext, StepResult
+  - `core/pipeline.py` — Pipeline orchestrator; dry-run and continue-on-error flags
+
+  **Step modules:**
+  - `steps/step2_csv_validation.py` — **fully implemented**: reads CSV, converts
+    DD-MMM-YY dates to ISO 8601, validates all REQUIRED_CSV_COLUMNS, stores
+    clean record list in ProcessingContext
+  - `steps/step3_metadata_embed.py` — **fully implemented**: Mutagen ID3v2.3 tag
+    embedding; all ATW tag mappings (TIT1/2/3, TALB, TPE1, COMM, TCOP, TPUB, TSRC,
+    TDAT, TYER, TORY, TRDA, TOFN, TCON, WOAS, WXXX, TEXT, TXXX:ISBJ/IPRD/TLOC/ICRD,
+    IPLS); copies originals to output/tmp/ before writing; saves with v2_version=3
+  - `steps/step1_csv_prep.py` — **stub**: structure and TODO comments in place
+  - `steps/step4_thumbnail_embed.py` — **stub**: structure and TODO comments in place
+  - `steps/step5_validation.py` — **stub**: structure and TODO comments in place
+
+  **CLI entry point (`hstl_audio.py`):**
+  - `init` — initialise batch; creates full directory tree; registers in BatchRegistry
+  - `batches` — list all active batches (--all for archived/completed)
+  - `run` — execute steps (--step N / --steps 1-3 / --all / --from N / --continue)
+  - `status` — show batch step completion and data directory
+  - `validate --dependencies` — checks mutagen, Pillow, PyYAML, colorama, tqdm
+  - `batch info/complete/archive/reactivate/remove` — lifecycle management
+
+  **GUI (`ham_gui.py` + `gui/`):**
+  - `ham_gui.py` — PyQt6 launcher; ATW icon (copied from audio-tag-writer project);
+    Windows AppUserModelID and taskbar icon fix via IconLoader
+  - `gui/main_window.py` — 4-tab QMainWindow (Batches / Current Batch / Config / Logs);
+    menu bar; status bar with version label; QSettings geometry persistence
+  - `gui/widgets/batch_list_widget.py` — sortable batch table with context menu
+  - `gui/widgets/step_widget.py` — per-step run buttons with status indicators;
+    progress bar; Run All button
+  - `gui/widgets/log_widget.py` — timestamped scrolling log pane with Clear button
+  - `gui/dialogs/new_batch_dialog.py` — name + folder-picker dialog
+  - `gui/dialogs/batch_info_dialog.py` — read-only batch detail dialog
+
+  **ATW icon set** (`gui/resources/icons/`) — copied from `audio-tag-writer` project:
+  app.ico, app.icns, app.png, app_16×16 through app_256×256
+
+- **`requirements.txt`** — mutagen>=1.47, Pillow>=10, PyYAML>=6, PyQt6>=6.6,
+  colorama>=0.4.6, tqdm>=4.66
+
+### Notes
+- Steps 1, 4, and 5 are stubs — implementation planned for subsequent sessions
+- Step widget runs steps on the main thread; QThread wrapping planned for next session
+- GUI Configuration tab is a placeholder; ConfigWidget implementation planned
+
+---
+
 ## HAM [0.0.2] - 2026-05-02 1800 CDT
 
 ### Changed

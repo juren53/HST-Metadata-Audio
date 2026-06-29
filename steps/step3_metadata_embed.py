@@ -16,7 +16,7 @@ from typing import Dict, List
 from steps.base_step import StepProcessor, ProcessingContext, StepResult
 from utils.validator import ValidationResult
 
-_TOOL_VERSION = "HAM v0.0.1"
+_TOOL_VERSION = "HAM v0.1.0"
 _STATIC_ARTIST = "Harry S. Truman Library"
 _STATIC_GROUPING = "NARA-HST-SRC Sound Recordings Collection"
 _STATIC_GENRE = "speech"
