@@ -30,6 +30,7 @@ from gui.widgets.batch_list_widget import BatchListWidget
 from gui.widgets.step_widget import StepWidget
 from gui.widgets.log_widget import LogWidget
 from gui.dialogs.new_batch_dialog import NewBatchDialog
+from gui.theme import DEFAULT_THEME, get_theme_registry, get_fusion_palette, is_dark_theme
 
 
 _logger = get_logger("ham-gui")
@@ -47,11 +48,15 @@ class MainWindow(QMainWindow):
         self.current_config: ConfigManager = None
         self.settings = QSettings("HSTL", "AudioMetadata")
 
+        saved = self.settings.value("theme/current", DEFAULT_THEME)
+        self.current_theme = saved if get_theme_registry().get_theme(saved) else DEFAULT_THEME
+
         self._init_ui()
         self._create_menu_bar()
         self._create_status_bar()
         self._load_window_state()
         self._refresh_batch_list()
+        self.apply_theme()
 
     # ──────────────────────────────────────────────────────────────────────
     # UI construction
@@ -112,6 +117,8 @@ class MainWindow(QMainWindow):
 
         # Edit
         edit_menu = mb.addMenu("&Edit")
+        self._add_action(edit_menu, "&Theme Selection…", self._show_theme_dialog)
+        edit_menu.addSeparator()
         self._add_action(edit_menu, "&Settings…", self._show_settings)
 
         # Batch
@@ -275,6 +282,31 @@ class MainWindow(QMainWindow):
             QDesktopServices.openUrl(QUrl.fromLocalFile(str(data_dir)))
         else:
             QMessageBox.warning(self, "Not Found", "Data directory not found")
+
+    def _show_theme_dialog(self):
+        registry = get_theme_registry()
+        themes = [
+            (registry.get_theme(n).display_name, n)
+            for n in registry.get_theme_names()
+            if registry.get_theme(n) is not None
+        ]
+        display_names = [d for d, _ in themes]
+        current_display = next(
+            (d for d, k in themes if k == self.current_theme), display_names[0]
+        )
+        from PyQt6.QtWidgets import QInputDialog
+        name, ok = QInputDialog.getItem(
+            self, "Select Theme", "Theme:", display_names,
+            display_names.index(current_display), editable=False,
+        )
+        if ok and name:
+            self.current_theme = next(k for d, k in themes if d == name)
+            self.apply_theme()
+            self.status_bar.showMessage(f"Applied {name} theme.", 2000)
+
+    def apply_theme(self):
+        QApplication.instance().setPalette(get_fusion_palette(self.current_theme))
+        self.settings.setValue("theme/current", self.current_theme)
 
     def _show_settings(self):
         # TODO: implement SettingsDialog

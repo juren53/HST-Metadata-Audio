@@ -73,6 +73,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Step widget runs steps on the main thread; QThread wrapping planned for next session
 - GUI Configuration tab is a placeholder; ConfigWidget implementation planned
 
+## HAM [0.1.1] - 2026-06-29 1300 CDT
+
+### Added
+- **ThemeManager integration** (`gui/theme.py`) — wires `~/Projects/ThemeManager`
+  into the HAM GUI; provides 6 built-in themes: light, dark, solarized\_light,
+  solarized\_dark, dracula, github
+- **Edit → Theme Selection…** menu item — `QInputDialog` theme picker that applies
+  the Fusion palette immediately and persists selection to QSettings
+- Theme loaded from QSettings on startup; falls back to `light` if saved theme
+  is not available
+
 ---
 
 ## HAM [0.0.2] - 2026-05-02 1800 CDT
