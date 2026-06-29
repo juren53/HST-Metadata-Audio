@@ -31,6 +31,7 @@ from gui.widgets.step_widget import StepWidget
 from gui.widgets.log_widget import LogWidget
 from gui.dialogs.new_batch_dialog import NewBatchDialog
 from gui.theme import DEFAULT_THEME, get_theme_registry, get_fusion_palette, is_dark_theme
+from gui.zoom_manager import ZoomManager
 
 
 _logger = get_logger("ham-gui")
@@ -50,6 +51,9 @@ class MainWindow(QMainWindow):
 
         saved = self.settings.value("theme/current", DEFAULT_THEME)
         self.current_theme = saved if get_theme_registry().get_theme(saved) else DEFAULT_THEME
+
+        self.zoom_manager = ZoomManager.instance()
+        self.zoom_manager.zoom_changed.connect(self._on_zoom_changed)
 
         self._init_ui()
         self._create_menu_bar()
@@ -120,6 +124,32 @@ class MainWindow(QMainWindow):
         self._add_action(edit_menu, "&Theme Selection…", self._show_theme_dialog)
         edit_menu.addSeparator()
         self._add_action(edit_menu, "&Settings…", self._show_settings)
+
+        # View
+        view_menu = mb.addMenu("&View")
+        zoom_in_action = QAction("Zoom &In", self)
+        zoom_in_action.setShortcut("Ctrl++")
+        zoom_in_action.setStatusTip("Increase zoom level")
+        zoom_in_action.triggered.connect(self._zoom_in)
+        view_menu.addAction(zoom_in_action)
+
+        zoom_in_alt = QAction(self)
+        zoom_in_alt.setShortcut("Ctrl+=")
+        zoom_in_alt.triggered.connect(self._zoom_in)
+        self.addAction(zoom_in_alt)
+
+        zoom_out_action = QAction("Zoom &Out", self)
+        zoom_out_action.setShortcut("Ctrl+-")
+        zoom_out_action.setStatusTip("Decrease zoom level")
+        zoom_out_action.triggered.connect(self._zoom_out)
+        view_menu.addAction(zoom_out_action)
+
+        view_menu.addSeparator()
+        zoom_reset_action = QAction("&Reset Zoom", self)
+        zoom_reset_action.setShortcut("Ctrl+0")
+        zoom_reset_action.setStatusTip("Reset zoom to 100%")
+        zoom_reset_action.triggered.connect(self._reset_zoom)
+        view_menu.addAction(zoom_reset_action)
 
         # Batch
         batch_menu = mb.addMenu("&Batch")
@@ -312,6 +342,33 @@ class MainWindow(QMainWindow):
         # TODO: implement SettingsDialog
         QMessageBox.information(self, "Settings", "Settings dialog — coming soon")
 
+    # ──────────────────────────────────────────────────────────────────────
+    # Zoom
+    # ──────────────────────────────────────────────────────────────────────
+
+    def _zoom_in(self):
+        self.zoom_manager.zoom_in(QApplication.instance())
+
+    def _zoom_out(self):
+        self.zoom_manager.zoom_out(QApplication.instance())
+
+    def _reset_zoom(self):
+        self.zoom_manager.reset_zoom(QApplication.instance())
+
+    def _on_zoom_changed(self, factor: float):
+        self.status_bar.showMessage(f"Zoom: {self.zoom_manager.get_zoom_percentage()}%", 2000)
+
+    def wheelEvent(self, event):
+        if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
+            app = QApplication.instance()
+            if event.angleDelta().y() > 0:
+                self.zoom_manager.zoom_in(app)
+            else:
+                self.zoom_manager.zoom_out(app)
+            event.accept()
+        else:
+            super().wheelEvent(event)
+
     def _show_about(self):
         QMessageBox.about(
             self,
@@ -341,6 +398,8 @@ class MainWindow(QMainWindow):
             if batch:
                 self._on_batch_selected(last, batch)
 
+        self.zoom_manager.apply_saved_zoom(QApplication.instance())
+
     def _save_window_state(self):
         self.settings.setValue("geometry", self.saveGeometry())
         self.settings.setValue("windowState", self.saveState())
@@ -349,4 +408,5 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event):
         self._save_window_state()
+        self.zoom_manager.save_zoom_preference()
         event.accept()

@@ -73,6 +73,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Step widget runs steps on the main thread; QThread wrapping planned for next session
 - GUI Configuration tab is a placeholder; ConfigWidget implementation planned
 
+## HAM [0.1.2] - 2026-06-29 1500 CDT
+
+### Added
+- **ZoomManager** (`gui/zoom_manager.py`) — singleton font-scaling manager; mirrors
+  `gui/zoom_manager.py` in HPM and the canonical `~/Projects/zoom-manager` module
+  - 8 discrete zoom levels: 75%–200% (0.75 / 0.85 / 1.0 / 1.15 / 1.3 / 1.5 / 1.75 / 2.0)
+  - Persists zoom level via `QSettings("HSTL", "AudioMetadata")` key `ui/zoom_level`
+  - Emits `zoom_changed(float)` signal; base font captured once at startup
+- **View menu** in `gui/main_window.py` — Zoom In (Ctrl++ / Ctrl+=), Zoom Out (Ctrl+-),
+  Reset Zoom (Ctrl+0); View sits between Edit and Batch in the menu bar
+- **Ctrl+Wheel zoom** — `wheelEvent` in `MainWindow` zooms in/out when Ctrl held
+- Base font initialized in `ham_gui.py` immediately after `app.setStyle("Fusion")`;
+  zoom preference applied at window load, saved at window close
+
+---
+
 ## HAM [0.1.1] - 2026-06-29 1300 CDT
 
 ### Added

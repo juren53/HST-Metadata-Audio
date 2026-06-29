@@ -43,6 +43,10 @@ def main():
     app.setOrganizationName("HSTL")
     app.setStyle("Fusion")
 
+    # Capture base font size before any zoom is applied
+    from gui.zoom_manager import ZoomManager
+    ZoomManager.instance().initialize_base_font(app)
+
     # Load icon via IconLoader if available, fall back to direct QIcon
     try:
         from icon_loader import IconLoader
