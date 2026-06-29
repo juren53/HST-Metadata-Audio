@@ -23,11 +23,8 @@ _STEP_LABELS = {
     5: "Output Validation & Reporting",
 }
 
-_CONTENT_MAX_WIDTH = 720
-
-
 class StepWidget(QWidget):
-    """Step execution panel for the Current Batch tab."""
+    """Step execution panel for the Current Batch tab (left column)."""
 
     step_executed = pyqtSignal(int, bool)  # (step_num, success)
 
@@ -41,15 +38,7 @@ class StepWidget(QWidget):
         self._init_ui()
 
     def _init_ui(self):
-        # Outer layout centres the content column horizontally
-        outer = QHBoxLayout(self)
-        outer.setContentsMargins(0, 0, 0, 0)
-
-        content = QWidget()
-        content.setMaximumWidth(_CONTENT_MAX_WIDTH)
-        content.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
-
-        layout = QVBoxLayout(content)
+        layout = QVBoxLayout(self)
         layout.setContentsMargins(12, 16, 12, 16)
         layout.setSpacing(8)
 
@@ -75,10 +64,6 @@ class StepWidget(QWidget):
         run_all_btn.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         run_all_btn.clicked.connect(self._run_all)
         layout.addWidget(run_all_btn, alignment=Qt.AlignmentFlag.AlignLeft)
-
-        outer.addStretch()
-        outer.addWidget(content)
-        outer.addStretch()
 
     def _build_step_row(self, step_num: int) -> QGroupBox:
         group = QGroupBox(f"Step {step_num}: {_STEP_LABELS[step_num]}")

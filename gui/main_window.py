@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 from PyQt6.QtWidgets import (
     QMainWindow, QTabWidget, QWidget, QVBoxLayout,
-    QScrollArea, QStatusBar, QLabel, QMessageBox,
+    QScrollArea, QSplitter, QStatusBar, QLabel, QMessageBox,
     QFileDialog, QApplication,
 )
 from PyQt6.QtCore import Qt, QSettings, pyqtSignal
@@ -28,6 +28,7 @@ from utils.logger import get_logger
 
 from gui.widgets.batch_list_widget import BatchListWidget
 from gui.widgets.step_widget import StepWidget
+from gui.widgets.batch_info_panel import BatchInfoPanel
 from gui.widgets.log_widget import LogWidget
 from gui.dialogs.new_batch_dialog import NewBatchDialog
 from gui.theme import DEFAULT_THEME, get_theme_registry, get_fusion_palette, is_dark_theme
@@ -90,10 +91,22 @@ class MainWindow(QMainWindow):
     def _create_current_batch_tab(self):
         self.step_widget = StepWidget()
         self.step_widget.step_executed.connect(self._on_step_executed)
-        scroll = QScrollArea()
-        scroll.setWidget(self.step_widget)
-        scroll.setWidgetResizable(True)
-        self.tabs.addTab(scroll, "Current Batch")
+        step_scroll = QScrollArea()
+        step_scroll.setWidget(self.step_widget)
+        step_scroll.setWidgetResizable(True)
+
+        self.batch_info_panel = BatchInfoPanel()
+        info_scroll = QScrollArea()
+        info_scroll.setWidget(self.batch_info_panel)
+        info_scroll.setWidgetResizable(True)
+
+        self.batch_splitter = QSplitter(Qt.Orientation.Horizontal)
+        self.batch_splitter.addWidget(step_scroll)
+        self.batch_splitter.addWidget(info_scroll)
+        self.batch_splitter.setStretchFactor(0, 6)
+        self.batch_splitter.setStretchFactor(1, 4)
+
+        self.tabs.addTab(self.batch_splitter, "Current Batch")
 
     def _create_config_tab(self):
         # TODO: implement ConfigWidget (stub placeholder)
@@ -245,6 +258,7 @@ class MainWindow(QMainWindow):
 
         self.registry.update_last_accessed(batch_id)
         self.step_widget.set_batch(self.current_config, batch_id, batch_info)
+        self.batch_info_panel.set_batch(self.current_config, batch_id, batch_info)
 
         self.log_widget.append(f"Selected batch: {batch_info['name']}")
         self.status_bar.showMessage(f"Current batch: {batch_info['name']}")
@@ -439,11 +453,16 @@ class MainWindow(QMainWindow):
             if batch:
                 self._on_batch_selected(last, batch)
 
+        splitter_state = self.settings.value("ui/splitter_current_batch")
+        if splitter_state:
+            self.batch_splitter.restoreState(splitter_state)
+
         self.zoom_manager.apply_saved_zoom(QApplication.instance())
 
     def _save_window_state(self):
         self.settings.setValue("geometry", self.saveGeometry())
         self.settings.setValue("windowState", self.saveState())
+        self.settings.setValue("ui/splitter_current_batch", self.batch_splitter.saveState())
         if self.current_batch_id:
             self.settings.setValue("lastBatch", self.current_batch_id)
 
