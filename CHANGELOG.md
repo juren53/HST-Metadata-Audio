@@ -73,6 +73,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Step widget runs steps on the main thread; QThread wrapping planned for next session
 - GUI Configuration tab is a placeholder; ConfigWidget implementation planned
 
+## HAM [0.1.3] - 2026-06-29 1700 CDT
+
+### Added
+- **`run.ps1`** — PowerShell launcher; auto-creates `.venv`, installs
+  `requirements.txt` on first run or when it changes, then launches `ham_gui.py`;
+  patterned after HPM `run.ps1`
+- **Help menu** expanded to match HPM: User Guide (F1), Change Log, HAM Issue
+  Tracker — all open GitHub URLs via `QDesktopServices`/`webbrowser`; `_open_url()`
+  helper with `webbrowser` fallback
+  - User Guide → `https://github.com/juren53/HST-Metadata-Audio/blob/master/README.md`
+  - Change Log → `https://github.com/juren53/HST-Metadata-Audio/blob/master/CHANGELOG.md`
+  - Issue Tracker → `https://github.com/juren53/HST-Metadata-Audio/issues`
+
+### Changed
+- **Step widget layout** — step rows now centred in a 720 px max-width column with
+  horizontal stretch spacers; status label fixed at 100 px, Run Step button fixed at
+  110 px; Run All button left-aligned and non-stretching (was full-width)
+- **Step 4 label** renamed from "Thumbnail Creation & Embedding" to "Album Art
+  Embedding" in `step_widget.py`, `step4_thumbnail_embed.py`, and CHANGELOG
+
+---
+
 ## HAM [0.1.2] - 2026-06-29 1500 CDT
 
 ### Added
