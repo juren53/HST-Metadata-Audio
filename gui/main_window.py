@@ -387,7 +387,7 @@ class MainWindow(QMainWindow):
         )
 
     def _show_issue_tracker(self):
-        self._open_url("https://github.com/juren53/HST-Metadata/issues", "Issue Tracker")
+        self._open_url("https://github.com/juren53/HST-Metadata-Audio/issues", "Issue Tracker")
 
     def _open_url(self, url: str, label: str):
         import webbrowser
