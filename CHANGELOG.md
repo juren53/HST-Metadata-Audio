@@ -11,6 +11,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## HAM [0.1.6] - 2026-06-29 1323 CDT
+
+### Fixed
+- **Right column Pipeline Progress** — removed redundant per-step detail
+  rows (duplicated the left column); only the "X of 5 steps complete"
+  summary line is now shown
+- **Batch ID and Data Directory labels** — removed hardcoded `font-size: 10px`;
+  both now inherit the application font size
+
+---
+
 ## HAM [0.1.5] - 2026-06-29 1304 CDT
 
 ### Added
