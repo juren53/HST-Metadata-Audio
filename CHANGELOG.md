@@ -11,6 +11,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## HAM [0.1.8] - 2026-06-29 1732 CDT
+
+### Added
+- **pyqt-app-info integration** — `Help → About` now uses the shared
+  `AboutDialog` from `pyqt-app-info` (pattern matches HPM, ATW, MDV):
+  - `AppIdentity` carries app name, short name, version, commit date,
+    description, and 5 feature bullets
+  - `gather_info()` auto-detects runtime environment (Python source vs.
+    PyInstaller compiled EXE)
+  - `AboutDialog` renders identity + execution mode + Python/platform info
+  - `requirements.txt` updated: `pyqt-app-info[qt]>=0.1.0`
+  - `HAM.spec` updated: `pyqt_app_info` and `pyqt_app_info.qt` added to
+    `hiddenimports` for EXE build
+
+---
+
 ## HAM [0.1.7] - 2026-06-29 1723 CDT
 
 ### Added
