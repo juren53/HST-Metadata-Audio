@@ -15,7 +15,7 @@ if os.path.isdir(_TM_PATH) and _TM_PATH not in sys.path:
 
 from theme_manager import get_theme_registry, get_fusion_palette, detect_system_theme  # noqa: F401
 
-DEFAULT_THEME = "light"
+DEFAULT_THEME = "dark"
 
 _DARK_THEMES = {"dark", "solarized_dark", "dracula"}
 

@@ -81,8 +81,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   solarized\_dark, dracula, github
 - **Edit → Theme Selection…** menu item — `QInputDialog` theme picker that applies
   the Fusion palette immediately and persists selection to QSettings
-- Theme loaded from QSettings on startup; falls back to `light` if saved theme
-  is not available
+- Theme loaded from QSettings on startup; default is **dark**; falls back to dark
+  if saved theme is not available in the registry
+
+### Fixed
+- **`app.setStyle("Fusion")`** added to `ham_gui.py` — without this, ThemeManager's
+  palette is applied to the native Windows style engine, causing menus and controls
+  to render incorrectly ("blown out")
+- **Default theme changed** from `light` to `dark` in `gui/theme.py`
 
 ---
 

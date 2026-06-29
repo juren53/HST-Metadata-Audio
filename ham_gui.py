@@ -41,6 +41,7 @@ def main():
     app.setApplicationName(__app_name__)
     app.setApplicationVersion(__version__)
     app.setOrganizationName("HSTL")
+    app.setStyle("Fusion")
 
     # Load icon via IconLoader if available, fall back to direct QIcon
     try:
