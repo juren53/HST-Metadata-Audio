@@ -73,6 +73,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Step widget runs steps on the main thread; QThread wrapping planned for next session
 - GUI Configuration tab is a placeholder; ConfigWidget implementation planned
 
+## HAM [0.1.4] - 2026-06-29 1830 CDT
+
+### Added
+- **Step 1 implemented** (`steps/step1_csv_prep.py`) — CSV preparation and
+  MP3/CSV filename matching; replaces stub:
+  - Locates the CSV in `input/csv/`; validates all `REQUIRED_CSV_COLUMNS` present
+  - Detects Sound\_File columns by name prefix (`sound_file*`), falls back to
+    positional columns beyond the required set
+  - Strips full URL prefixes from Sound\_File values to extract bare MP3 basenames
+    (adapted from `match-audio-files.py`)
+  - Reports matched / CSV-only / MP3-only file counts via logger
+  - Writes `reports/step1_prep_report.txt` with full match detail
+  - Populates `context.shared_data`: `csv_path`, `sound_file_cols`,
+    `matched_mp3s`, `unmatched_csv_files`, `unmatched_mp3_files`
+  - Fails only when no matches found; unmatched files are warnings
+
+---
+
 ## HAM [0.1.3] - 2026-06-29 1700 CDT
 
 ### Added
