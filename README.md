@@ -1,69 +1,137 @@
-# HSTL Audio Metadata Project
+# HSTL Audio Metadata (HAM)
 
-This portion of the project will embed metadata from the Truman Library archives into approximately 2,000 audio files (WAV and MP3) for upload to the National Archives and Records Administration (NARA) catalog.
+An end-to-end framework for embedding archival metadata into MP3 sound recordings from the Harry S. Truman Presidential Library (HSTL) for submission to the National Archives and Records Administration (NARA) catalog.
 
 ## Overview
 
-Audio recordings from the Harry S. Truman Presidential Library are cataloged in an internal database. This project extracts that metadata, generates thumbnails, and embeds both into the audio files using standard ID3 tags before submission to the NARA catalog.
+Approximately 2,000 audio files (MP3) require standardized ID3v2.3 metadata tags and custom album art before upload to the NARA catalog. HAM automates this as a five-step pipeline driven by a CSV export from the HSTL internal database.
 
-## Process Steps
+Metadata is written using **[Mutagen](https://mutagen.readthedocs.io/)** — a pure-Python ID3 library that gives precise control over tag frames and versions. FFmpeg is retained as a fallback tool for manual inspection and validation of embedded tags.
 
-1. **Export HST Audio DB metadata to a CSV file** — The source CSV includes fields such as title, accession number, date, restrictions, description, speakers, production/copyright information, and up to ten associated audio file URLs.
-2. **Match audio files** — `match-audio-files.py` cross-references MP3 files in the working directory against filenames listed in the CSV, reporting matches and missing files.
-3. **Create HST thumbnail with accession number** — Generate a cover image that includes the accession number for each recording.
-4. **Embed thumbnail and metadata in MP3 file** — Use `ffmpeg` to write ID3v2 tags (title, date, description, speakers, etc.) and attach the thumbnail as cover art.
+## Five-Step Pipeline
+
+| Step | Name | Status |
+|---|---|---|
+| 1 | CSV Preparation & Validation | Stub |
+| 2 | CSV Validation & Date Conversion | Implemented |
+| 3 | Metadata Tag Embedding | Implemented |
+| 4 | Album Art Embedding | Stub |
+| 5 | Output Validation & Reporting | Stub |
+
+**Step 2** reads the CSV, validates all required fields, and converts dates from `DD-MMM-YY` format to ISO 8601.
+
+**Step 3** embeds all ID3v2.3 tag frames via Mutagen — including title, date, description, speakers, copyright, ISRC, genre, and custom TXXX frames — then saves each MP3 with `v2_version=3`. Original files are backed up to `output/tmp/` before any writes.
+
+**Step 4** will use Pillow to overlay the accession number on the base thumbnail image (`HST-thumbnail-c.png`) and embed the result as an APIC (album art) frame.
+
+## Running HAM
+
+### GUI (recommended)
+
+```powershell
+.\run.ps1
+```
+
+Creates a `.venv`, installs dependencies on first run, and launches the PyQt6 desktop application.
+
+### CLI
+
+```bash
+python hstl_audio.py --help
+
+# Initialize a new batch
+python hstl_audio.py init "Round 4" --data-dir "C:\path\to\data"
+
+# Run all steps
+python hstl_audio.py run --all
+
+# Run a specific step
+python hstl_audio.py run --step 3
+
+# Check dependency status
+python hstl_audio.py validate --dependencies
+```
 
 ## CSV Metadata Fields
 
-| Field | Description |
-|---|---|
-| `title` | Recording title |
-| `Accession Number` | HSTL accession identifier (e.g., `SR62-122`) |
-| `Date` | Recording date |
-| `Restrictions` | Access restrictions |
-| `Description` | Archival description of the recording |
-| `Speakers` | Named speakers |
-| `Production and Copyright` | Broadcast network or production credit |
-| `Sound_File_1–10` | URLs to individual audio file segments |
+| Field | ID3 Frame | Notes |
+|---|---|---|
+| `title` | TIT2 | Recording title |
+| `Accession Number` | TSRC, TOFN, TXXX:ISBJ, TXXX:IPRD | Multiple frames |
+| `Date` | TDAT, TYER, TORY, TRDA, TXXX:ICRD | DD-MMM-YY → ISO 8601 |
+| `Restrictions` | TIT3 | Subtitle / access note |
+| `Description` | COMM, TEXT | Comment and lyrics frames |
+| `Place` | TXXX:TLOC | Custom location frame |
+| `Speakers` | IPLS | Involved people list |
+| `Production and Copyright` | TCOP, TPUB, WOAS, WXXX | Copyright + publisher |
 
-## Scripts
+All tags saved as **ID3v2.3** (required for TDAT, TRDA, TORY, TYER, IPLS frames).
 
-### `match-audio-files.py`
-Compares MP3 filenames in the current working directory against the filenames extracted from the CSV. Outputs a count of matches and a list of any unmatched files.
-
-**Requirements:** Python 3, `pandas`
-
-```bash
-python3 match-audio-files.py
-```
-
-## Embedding Metadata with ffmpeg
-
-To embed album art (thumbnail) into an MP3 file:
-
-```bash
-ffmpeg -i input.mp3 -i thumbnail.jpg \
-  -map 0 -map 1 -c copy \
-  -id3v2_version 3 \
-  -metadata:s:v title="Album cover" \
-  -metadata:s:v comment="Cover (Front)" \
-  output.mp3
-```
-
-## Repository Structure
+## Project Structure
 
 ```
 Audio/
-├── match-audio-files.py     # File matching utility
-├── HSTL-audio-test.csv      # Sample metadata export
-├── test.csv                 # Test CSV for development
-├── background/              # Reference notes on audio formats (BWF)
-├── docs/                    # Project documentation
-└── notes/                   # ffmpeg recipes and working notes
+├── ham_gui.py                 # PyQt6 GUI launcher
+├── hstl_audio.py              # CLI entry point
+├── run.ps1                    # PowerShell launcher (venv + deps)
+├── requirements.txt
+├── __init__.py                # Version constants
+├── config/
+│   ├── config_manager.py      # YAML-backed batch configuration
+│   └── settings.py            # Defaults and required CSV columns
+├── core/
+│   └── pipeline.py            # Step orchestrator
+├── steps/
+│   ├── base_step.py           # StepProcessor ABC
+│   ├── step1_csv_prep.py      # Stub
+│   ├── step2_csv_validation.py
+│   ├── step3_metadata_embed.py
+│   ├── step4_thumbnail_embed.py  # Stub
+│   └── step5_validation.py    # Stub
+├── utils/
+│   ├── batch_registry.py      # YAML batch registry
+│   ├── path_manager.py        # Batch directory layout
+│   ├── logger.py              # HAMLogger with SUCCESS level
+│   ├── validator.py           # ValidationResult dataclass
+│   └── file_utils.py
+├── gui/
+│   ├── main_window.py         # 4-tab QMainWindow
+│   ├── theme.py               # ThemeManager integration (6 themes)
+│   ├── zoom_manager.py        # Font-scaling zoom (75%–200%)
+│   ├── widgets/
+│   └── dialogs/
+├── docs/
+│   └── HSTL_Audio_Framework-Development_Plan.md
+└── analysis/                  # Working files and catalog exports
 ```
 
 ## Dependencies
 
-- Python 3
-- [pandas](https://pandas.pydata.org/)
-- [ffmpeg](https://ffmpeg.org/)
+| Package | Purpose |
+|---|---|
+| [mutagen](https://mutagen.readthedocs.io/) ≥ 1.47 | ID3v2.3 tag embedding (primary) |
+| [Pillow](https://python-pillow.org/) ≥ 10.0 | Album art generation (Step 4) |
+| [PyYAML](https://pyyaml.org/) ≥ 6.0 | Batch registry and config files |
+| [PyQt6](https://www.riverbankcomputing.com/software/pyqt/) ≥ 6.6 | Desktop GUI |
+| [colorama](https://github.com/tartley/colorama) ≥ 0.4.6 | CLI colour output |
+| [tqdm](https://tqdm.github.io/) ≥ 4.66 | CLI progress bars |
+
+### FFmpeg (optional)
+
+FFmpeg is **not required** to run HAM. It is useful as a fallback tool for independently verifying that ID3 tags were embedded correctly:
+
+```bash
+# Inspect tags written by Mutagen
+ffprobe -v quiet -print_format json -show_format output.mp3
+
+# Manually embed album art for comparison/testing
+ffmpeg -i input.mp3 -i thumbnail.jpg \
+  -map 0 -map 1 -c copy \
+  -id3v2_version 3 \
+  output.mp3
+```
+
+## Related Projects
+
+- **HPM** — HSTL Photo Metadata Framework (`HST-Metadata/Photos/Version-2/Framework/`)
+- **ATW** — Audio Tag Writer prototype (`audio-tag-writer/`) — the standalone script that preceded HAM; icon set reused in HAM GUI
