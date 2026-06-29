@@ -11,6 +11,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## HAM [0.1.7] - 2026-06-29 1723 CDT
+
+### Added
+- **PyInstaller build** (`HAM.spec`, `version_info.txt`) — first standalone
+  Windows EXE build:
+  - Single-file EXE; UPX compressed; `console=False` (no terminal window)
+  - Bundles ThemeManager and Icon\_Manager\_Module via `pathex`
+  - All HAM packages, PyQt6, mutagen, Pillow, PyYAML, colorama, tqdm included
+  - Windows EXE metadata: company, product name, file version embedded via
+    `version_info.txt`
+  - `build/` and `dist/` added to `.gitignore`
+  - Rebuild command: `.\.venv\Scripts\pyinstaller.exe HAM.spec`
+
+---
+
 ## HAM [0.1.6] - 2026-06-29 1323 CDT
 
 ### Fixed
