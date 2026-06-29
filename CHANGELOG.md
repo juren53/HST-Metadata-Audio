@@ -11,6 +11,87 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## HAM [0.1.4] - 2026-06-29 1830 CDT
+
+### Added
+- **Step 1 implemented** (`steps/step1_csv_prep.py`) — CSV preparation and
+  MP3/CSV filename matching; replaces stub:
+  - Locates the CSV in `input/csv/`; validates all `REQUIRED_CSV_COLUMNS` present
+  - Detects Sound\_File columns by name prefix (`sound_file*`), falls back to
+    positional columns beyond the required set
+  - Strips full URL prefixes from Sound\_File values to extract bare MP3 basenames
+    (adapted from `match-audio-files.py`)
+  - Reports matched / CSV-only / MP3-only file counts via logger
+  - Writes `reports/step1_prep_report.txt` with full match detail
+  - Populates `context.shared_data`: `csv_path`, `sound_file_cols`,
+    `matched_mp3s`, `unmatched_csv_files`, `unmatched_mp3_files`
+  - Fails only when no matches found; unmatched files are warnings
+
+### Fixed
+- **New Batch button** on Batches tab was dead — `_handle_batch_action()` called
+  `registry.get_batch("")` before checking the action, got `None`, and returned
+  early; `"new"` is now intercepted before the registry lookup and routed to
+  `_new_batch()` (workaround: File → New Batch… still worked)
+
+---
+
+## HAM [0.1.3] - 2026-06-29 1700 CDT
+
+### Added
+- **`run.ps1`** — PowerShell launcher; auto-creates `.venv`, installs
+  `requirements.txt` on first run or when it changes, then launches `ham_gui.py`;
+  patterned after HPM `run.ps1`
+- **Help menu** expanded to match HPM: User Guide (F1), Change Log, HAM Issue
+  Tracker — all open GitHub URLs via `QDesktopServices`/`webbrowser`; `_open_url()`
+  helper with `webbrowser` fallback
+  - User Guide → `https://github.com/juren53/HST-Metadata-Audio/blob/master/README.md`
+  - Change Log → `https://github.com/juren53/HST-Metadata-Audio/blob/master/CHANGELOG.md`
+  - Issue Tracker → `https://github.com/juren53/HST-Metadata-Audio/issues`
+
+### Changed
+- **Step widget layout** — step rows now centred in a 720 px max-width column with
+  horizontal stretch spacers; status label fixed at 100 px, Run Step button fixed at
+  110 px; Run All button left-aligned and non-stretching (was full-width)
+- **Step 4 label** renamed from "Thumbnail Creation & Embedding" to "Album Art
+  Embedding" in `step_widget.py`, `step4_thumbnail_embed.py`
+
+---
+
+## HAM [0.1.2] - 2026-06-29 1500 CDT
+
+### Added
+- **ZoomManager** (`gui/zoom_manager.py`) — singleton font-scaling manager; mirrors
+  `gui/zoom_manager.py` in HPM and the canonical `~/Projects/zoom-manager` module
+  - 8 discrete zoom levels: 75%–200% (0.75 / 0.85 / 1.0 / 1.15 / 1.3 / 1.5 / 1.75 / 2.0)
+  - Persists zoom level via `QSettings("HSTL", "AudioMetadata")` key `ui/zoom_level`
+  - Emits `zoom_changed(float)` signal; base font captured once at startup
+- **View menu** in `gui/main_window.py` — Zoom In (Ctrl++ / Ctrl+=), Zoom Out (Ctrl+-),
+  Reset Zoom (Ctrl+0); View sits between Edit and Batch in the menu bar
+- **Ctrl+Wheel zoom** — `wheelEvent` in `MainWindow` zooms in/out when Ctrl held
+- Base font initialized in `ham_gui.py` immediately after `app.setStyle("Fusion")`;
+  zoom preference applied at window load, saved at window close
+
+---
+
+## HAM [0.1.1] - 2026-06-29 1300 CDT
+
+### Added
+- **ThemeManager integration** (`gui/theme.py`) — wires `~/Projects/ThemeManager`
+  into the HAM GUI; provides 6 built-in themes: light, dark, solarized\_light,
+  solarized\_dark, dracula, github
+- **Edit → Theme Selection…** menu item — `QInputDialog` theme picker that applies
+  the Fusion palette immediately and persists selection to QSettings
+- Theme loaded from QSettings on startup; default is **dark**; falls back to dark
+  if saved theme is not available in the registry
+
+### Fixed
+- **`app.setStyle("Fusion")`** added to `ham_gui.py` — without this, ThemeManager's
+  palette is applied to the native Windows style engine, causing menus and controls
+  to render incorrectly ("blown out")
+- **Default theme changed** from `light` to `dark` in `gui/theme.py`
+
+---
+
 ## HAM [0.1.0] - 2026-06-29 1200 CDT
 
 ### Added
@@ -72,79 +153,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Steps 1, 4, and 5 are stubs — implementation planned for subsequent sessions
 - Step widget runs steps on the main thread; QThread wrapping planned for next session
 - GUI Configuration tab is a placeholder; ConfigWidget implementation planned
-
-## HAM [0.1.4] - 2026-06-29 1830 CDT
-
-### Added
-- **Step 1 implemented** (`steps/step1_csv_prep.py`) — CSV preparation and
-  MP3/CSV filename matching; replaces stub:
-  - Locates the CSV in `input/csv/`; validates all `REQUIRED_CSV_COLUMNS` present
-  - Detects Sound\_File columns by name prefix (`sound_file*`), falls back to
-    positional columns beyond the required set
-  - Strips full URL prefixes from Sound\_File values to extract bare MP3 basenames
-    (adapted from `match-audio-files.py`)
-  - Reports matched / CSV-only / MP3-only file counts via logger
-  - Writes `reports/step1_prep_report.txt` with full match detail
-  - Populates `context.shared_data`: `csv_path`, `sound_file_cols`,
-    `matched_mp3s`, `unmatched_csv_files`, `unmatched_mp3_files`
-  - Fails only when no matches found; unmatched files are warnings
-
----
-
-## HAM [0.1.3] - 2026-06-29 1700 CDT
-
-### Added
-- **`run.ps1`** — PowerShell launcher; auto-creates `.venv`, installs
-  `requirements.txt` on first run or when it changes, then launches `ham_gui.py`;
-  patterned after HPM `run.ps1`
-- **Help menu** expanded to match HPM: User Guide (F1), Change Log, HAM Issue
-  Tracker — all open GitHub URLs via `QDesktopServices`/`webbrowser`; `_open_url()`
-  helper with `webbrowser` fallback
-  - User Guide → `https://github.com/juren53/HST-Metadata-Audio/blob/master/README.md`
-  - Change Log → `https://github.com/juren53/HST-Metadata-Audio/blob/master/CHANGELOG.md`
-  - Issue Tracker → `https://github.com/juren53/HST-Metadata-Audio/issues`
-
-### Changed
-- **Step widget layout** — step rows now centred in a 720 px max-width column with
-  horizontal stretch spacers; status label fixed at 100 px, Run Step button fixed at
-  110 px; Run All button left-aligned and non-stretching (was full-width)
-- **Step 4 label** renamed from "Thumbnail Creation & Embedding" to "Album Art
-  Embedding" in `step_widget.py`, `step4_thumbnail_embed.py`, and CHANGELOG
-
----
-
-## HAM [0.1.2] - 2026-06-29 1500 CDT
-
-### Added
-- **ZoomManager** (`gui/zoom_manager.py`) — singleton font-scaling manager; mirrors
-  `gui/zoom_manager.py` in HPM and the canonical `~/Projects/zoom-manager` module
-  - 8 discrete zoom levels: 75%–200% (0.75 / 0.85 / 1.0 / 1.15 / 1.3 / 1.5 / 1.75 / 2.0)
-  - Persists zoom level via `QSettings("HSTL", "AudioMetadata")` key `ui/zoom_level`
-  - Emits `zoom_changed(float)` signal; base font captured once at startup
-- **View menu** in `gui/main_window.py` — Zoom In (Ctrl++ / Ctrl+=), Zoom Out (Ctrl+-),
-  Reset Zoom (Ctrl+0); View sits between Edit and Batch in the menu bar
-- **Ctrl+Wheel zoom** — `wheelEvent` in `MainWindow` zooms in/out when Ctrl held
-- Base font initialized in `ham_gui.py` immediately after `app.setStyle("Fusion")`;
-  zoom preference applied at window load, saved at window close
-
----
-
-## HAM [0.1.1] - 2026-06-29 1300 CDT
-
-### Added
-- **ThemeManager integration** (`gui/theme.py`) — wires `~/Projects/ThemeManager`
-  into the HAM GUI; provides 6 built-in themes: light, dark, solarized\_light,
-  solarized\_dark, dracula, github
-- **Edit → Theme Selection…** menu item — `QInputDialog` theme picker that applies
-  the Fusion palette immediately and persists selection to QSettings
-- Theme loaded from QSettings on startup; default is **dark**; falls back to dark
-  if saved theme is not available in the registry
-
-### Fixed
-- **`app.setStyle("Fusion")`** added to `ham_gui.py` — without this, ThemeManager's
-  palette is applied to the native Windows style engine, causing menus and controls
-  to render incorrectly ("blown out")
-- **Default theme changed** from `light` to `dark` in `gui/theme.py`
 
 ---
 
