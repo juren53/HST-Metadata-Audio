@@ -48,8 +48,11 @@ class NewBatchDialog(QDialog):
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
 
+    _DEFAULT_DIR = r"C:\Data\HSTL_Audio_Batches"
+
     def _browse(self):
-        folder = QFileDialog.getExistingDirectory(self, "Select Data Directory")
+        start = self._DEFAULT_DIR if Path(self._DEFAULT_DIR).exists() else ""
+        folder = QFileDialog.getExistingDirectory(self, "Select Data Directory", start)
         if folder:
             self.dir_edit.setText(folder)
             if not self.name_edit.text():
