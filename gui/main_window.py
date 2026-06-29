@@ -251,6 +251,9 @@ class MainWindow(QMainWindow):
         self.tabs.setCurrentIndex(1)
 
     def _handle_batch_action(self, action: str, batch_id: str):
+        if action == "new":
+            self._new_batch()
+            return
         batch = self.registry.get_batch(batch_id)
         if not batch:
             return
