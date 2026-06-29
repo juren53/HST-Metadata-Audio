@@ -11,6 +11,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## HAM [0.1.5] - 2026-06-29 1304 CDT
+
+### Added
+- **Two-column layout** for Current Batch tab — left column retains the
+  five-step workflow panel; right column is a new `BatchInfoPanel` widget:
+  - **Batch Details** — Name, Batch ID, Status, Created, Last Accessed
+  - **Pipeline Progress** — "X of 5 steps complete" summary + per-step
+    ✓ Done / ○ Pending with step label for each of the 5 steps
+  - **Input Files** — CSV filename, CSV file size (KB/MB), MP3 file count,
+    Refresh button to rescan `input/csv/` and `input/mp3/`
+  - **Data Directory** — full path + Open Folder button
+  - Splitter position (default 60/40) persists across sessions via QSettings
+- **Default Browse directory** (`C:\Data\HSTL_Audio_Batches`) in New Batch
+  dialog — if the path does not exist, user is prompted to create it; error
+  dialog shown if creation fails; falls back to OS default if declined
+
+### Changed
+- `StepWidget` centering removed — step rows now fill the left column
+  naturally (centering HBox/max-width was only appropriate when the widget
+  occupied the full tab width)
+
+---
+
 ## HAM [0.1.4] - 2026-06-29 1830 CDT
 
 ### Added
