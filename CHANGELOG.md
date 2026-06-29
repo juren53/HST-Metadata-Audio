@@ -39,7 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     TDAT, TYER, TORY, TRDA, TOFN, TCON, WOAS, WXXX, TEXT, TXXX:ISBJ/IPRD/TLOC/ICRD,
     IPLS); copies originals to output/tmp/ before writing; saves with v2_version=3
   - `steps/step1_csv_prep.py` — **stub**: structure and TODO comments in place
-  - `steps/step4_thumbnail_embed.py` — **stub**: structure and TODO comments in place
+  - `steps/step4_thumbnail_embed.py` — **stub** (Album Art Embedding): structure and TODO comments in place
   - `steps/step5_validation.py` — **stub**: structure and TODO comments in place
 
   **CLI entry point (`hstl_audio.py`):**

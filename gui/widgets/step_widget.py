@@ -19,7 +19,7 @@ _STEP_LABELS = {
     1: "CSV Preparation & Validation",
     2: "CSV Validation & Date Conversion",
     3: "Metadata Tag Embedding",
-    4: "Thumbnail Creation & Embedding",
+    4: "Album Art Embedding",
     5: "Output Validation & Reporting",
 }
 

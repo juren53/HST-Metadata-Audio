@@ -1,5 +1,5 @@
 """
-Step 4 – Thumbnail Creation & Embedding (STUB)
+Step 4 – Album Art Embedding (STUB)
 
 Uses Pillow to overlay the accession number on HST-thumbnail-c.png,
 generates a JPEG in memory (BytesIO), then uses Mutagen to embed it
@@ -22,7 +22,7 @@ class Step4_ThumbnailEmbed(StepProcessor):
     """Create accession-number thumbnails and embed as album art (APIC)."""
 
     def __init__(self):
-        super().__init__(4, "Thumbnail Creation & Embedding")
+        super().__init__(4, "Album Art Embedding")
 
     def validate_inputs(self, context: ProcessingContext) -> ValidationResult:
         result = ValidationResult()
