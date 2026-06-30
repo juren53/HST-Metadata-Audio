@@ -35,7 +35,12 @@ class StepWidget(QWidget):
         self.batch_info: dict = {}
         self._step_btns: dict = {}
         self._step_status: dict = {}
+        self._qt_log_handler = None   # set via set_log_handler()
         self._init_ui()
+
+    def set_log_handler(self, handler):
+        """Wire a QtLogHandler so step log records reach the GUI and log file."""
+        self._qt_log_handler = handler
 
     def _init_ui(self):
         layout = QVBoxLayout(self)
@@ -123,6 +128,7 @@ class StepWidget(QWidget):
         # TODO: run in a QThread so the GUI stays responsive during long steps
         if self.config is None:
             return
+        import time
         from pathlib import Path
         from utils.path_manager import PathManager
         from steps.base_step import ProcessingContext
@@ -143,13 +149,26 @@ class StepWidget(QWidget):
 
         data_dir = Path(self.config.get("project.data_directory"))
         paths = PathManager(data_dir)
-        logger = get_logger("ham-gui-step")
+
+        # Unique logger name per run avoids handler accumulation across runs
+        logger_name = f"ham-step{step_num}-{int(time.time())}"
+        ts = __import__("datetime").datetime.now().strftime("%Y%m%d_%H%M%S")
+        log_file = paths.logs_dir / f"step{step_num}_{ts}.log"
+        logger = get_logger(logger_name, log_file=log_file)
+
+        if self._qt_log_handler is not None:
+            logger.addHandler(self._qt_log_handler)
+
         context = ProcessingContext(paths, self.config, logger, batch_id=self.batch_id)
 
         step = _STEP_CLASSES[step_num]()
         result = step.run(context)
 
-        self.log_to_gui(f"Step {step_num}: {'OK' if result.success else 'FAILED'} — {result.message}")
+        level = "INFO" if result.success else "ERROR"
+        self.log_to_gui(
+            f"Step {step_num}: {'OK' if result.success else 'FAILED'} — {result.message}",
+            level,
+        )
         self._refresh_step_status()
         self.step_executed.emit(step_num, result.success)
 
@@ -166,6 +185,7 @@ class StepWidget(QWidget):
             if not self.config.get_step_status(step_num):
                 break
 
-    def log_to_gui(self, msg: str):
-        """Placeholder — wire to the Logs tab in a future session."""
-        pass
+    def log_to_gui(self, msg: str, level: str = "INFO"):
+        """Forward a message to the GUI log via the QtLogHandler signal."""
+        if self._qt_log_handler is not None:
+            self._qt_log_handler.log_record.emit(msg, level)
