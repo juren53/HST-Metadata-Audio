@@ -5,57 +5,81 @@ New Batch Dialog for HAM GUI.
 from pathlib import Path
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QFormLayout, QLineEdit,
-    QPushButton, QHBoxLayout, QFileDialog, QDialogButtonBox, QLabel, QMessageBox,
+    QPushButton, QHBoxLayout, QFileDialog, QDialogButtonBox,
+    QLabel, QMessageBox,
 )
+from PyQt6.QtCore import Qt
+
+
+_DEFAULT_ROOT = r"C:\Data\HSTL_Audio_Batches"
 
 
 class NewBatchDialog(QDialog):
-    """Prompt the user for a batch name and data directory."""
+    """Prompt the user for a batch name; derive a unique data directory."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("New Batch Project")
-        self.setMinimumWidth(420)
+        self.setMinimumWidth(480)
         self._init_ui()
 
     def _init_ui(self):
         layout = QVBoxLayout(self)
 
-        layout.addWidget(QLabel("Create a new HAM batch project.\n"
-                                "MP3 files go in: <data_dir>/input/mp3/\n"
-                                "CSV file goes in: <data_dir>/input/csv/"))
+        layout.addWidget(QLabel(
+            "Create a new HAM batch project.\n"
+            "A sub-folder named after the batch will be created inside the root directory."
+        ))
 
         form = QFormLayout()
+
+        # --- Batch name ---
         self.name_edit = QLineEdit()
         self.name_edit.setPlaceholderText("e.g. SR59_Series")
-        form.addRow("Project name:", self.name_edit)
+        self.name_edit.textChanged.connect(self._update_preview)
+        form.addRow("Batch name:", self.name_edit)
 
-        dir_row = QHBoxLayout()
-        self.dir_edit = QLineEdit()
-        self.dir_edit.setPlaceholderText("Select a folder…")
+        # --- Root directory (parent) ---
+        root_row = QHBoxLayout()
+        self.root_edit = QLineEdit(_DEFAULT_ROOT)
+        self.root_edit.textChanged.connect(self._update_preview)
         browse_btn = QPushButton("Browse…")
         browse_btn.clicked.connect(self._browse)
-        dir_row.addWidget(self.dir_edit)
-        dir_row.addWidget(browse_btn)
-        form.addRow("Data directory:", dir_row)
+        root_row.addWidget(self.root_edit)
+        root_row.addWidget(browse_btn)
+        form.addRow("Batches root:", root_row)
 
         layout.addLayout(form)
+
+        # --- Live preview of computed data_dir ---
+        self._preview_label = QLabel()
+        self._preview_label.setWordWrap(True)
+        self._preview_label.setStyleSheet("font-family: monospace; color: gray;")
+        layout.addWidget(self._preview_label)
+        self._update_preview()
 
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
         )
-        buttons.accepted.connect(self.accept)
+        buttons.accepted.connect(self._on_accept)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
 
-    _DEFAULT_DIR = r"C:\Data\HSTL_Audio_Batches"
+    def _update_preview(self):
+        name = self.name_edit.text().strip()
+        root = self.root_edit.text().strip()
+        if name and root:
+            path = str(Path(root) / name)
+            self._preview_label.setText(f"Will be created at: {path}")
+        else:
+            self._preview_label.setText("Will be created at: (enter batch name above)")
 
     def _browse(self):
-        default = Path(self._DEFAULT_DIR)
+        default = Path(self.root_edit.text().strip() or _DEFAULT_ROOT)
         if not default.exists():
             reply = QMessageBox.question(
                 self, "Create Directory?",
-                f"{self._DEFAULT_DIR} does not exist.\n\nCreate it now?",
+                f"{default} does not exist.\n\nCreate it now?",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             )
             if reply == QMessageBox.StandardButton.Yes:
@@ -64,11 +88,23 @@ class NewBatchDialog(QDialog):
                 except Exception as e:
                     QMessageBox.warning(self, "Error", f"Could not create directory:\n{e}")
         start = str(default) if default.exists() else ""
-        folder = QFileDialog.getExistingDirectory(self, "Select Data Directory", start)
+        folder = QFileDialog.getExistingDirectory(self, "Select Batches Root Directory", start)
         if folder:
-            self.dir_edit.setText(folder)
-            if not self.name_edit.text():
-                self.name_edit.setText(Path(folder).name)
+            self.root_edit.setText(folder)
+
+    def _on_accept(self):
+        name = self.name_edit.text().strip()
+        root = self.root_edit.text().strip()
+        if not name:
+            QMessageBox.warning(self, "Missing Name", "Please enter a batch name.")
+            return
+        if not root:
+            QMessageBox.warning(self, "Missing Directory", "Please select a batches root directory.")
+            return
+        self.accept()
 
     def get_values(self):
-        return self.name_edit.text().strip(), self.dir_edit.text().strip()
+        """Return (batch_name, data_dir) where data_dir = root / batch_name."""
+        name = self.name_edit.text().strip()
+        root = Path(self.root_edit.text().strip())
+        return name, str(root / name)
