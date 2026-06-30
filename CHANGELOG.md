@@ -11,6 +11,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## HAM [0.2.0] - 2026-06-29 2001 CDT
+
+### Added
+- **Step 4 implemented** (`steps/step4_thumbnail_embed.py`) — Album Art
+  Embedding; pure Pillow + Mutagen, no FFmpeg required:
+  - Opens `assets/HST-blank-album-art.jpg` as base image
+  - Overlays accession number in Arial Bold 32 / yellow / x=10,y=10 with
+    semi-transparent black background box for legibility; font fallback
+    chain: `arialbd.ttf` → `arial.ttf` → Pillow default
+  - Encodes result as JPEG in-memory (BytesIO, quality=90)
+  - Embeds as APIC type-3 (front cover) frame via Mutagen ID3; saves to
+    `output/processed/` as ID3v2.3
+  - `validate_outputs` spot-checks APIC frame presence in each output file
+- **`assets/HST-blank-album-art.jpg`** — canonical 43 KB base album art
+  image committed to repo; `PathManager.thumbnail_base` updated to point
+  to this file
+
+---
+
 ## HAM [0.1.9] - 2026-06-29 1931 CDT
 
 ### Added
