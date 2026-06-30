@@ -11,6 +11,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## HAM [0.2.2] - 2026-06-29 2033 CDT
+
+### Fixed
+- **New Batch dialog**: each batch now gets its own isolated sub-directory
+  under the batches root instead of all batches sharing the same folder.
+  - Browse now selects the **batches root** (default `C:\Data\HSTL_Audio_Batches`);
+    the actual `data_dir` is computed as `<root>\<batch_name>`
+  - Live preview label shows the computed path as the user types the batch name
+  - Validation prevents accepting the dialog with an empty name or root field
+  - Example result: `C:\Data\HSTL_Audio_Batches\SR59_Series\` with full
+    `input/`, `output/`, `reports/`, `logs/`, `config/` sub-tree
+
+---
+
 ## HAM [0.2.1] - 2026-06-29 2005 CDT
 
 ### Added

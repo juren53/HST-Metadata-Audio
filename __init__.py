@@ -3,7 +3,7 @@ HAM – HSTL Audio Metadata Framework
 """
 import datetime as _dt, time as _time
 
-__version__ = "0.2.1"
+__version__ = "0.2.2"
 
 _now = _dt.datetime.now()
 _tz_full = _time.tzname[_time.localtime().tm_isdst]
