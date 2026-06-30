@@ -64,7 +64,7 @@ class PathManager:
 
     @property
     def thumbnail_base(self) -> Path:
-        return self.assets_dir / "HST-thumbnail-c.png"
+        return self.assets_dir / "HST-blank-album-art.jpg"
 
     def find_csv_file(self) -> Optional[Path]:
         """Return the first CSV file found in input/csv/, or None."""
