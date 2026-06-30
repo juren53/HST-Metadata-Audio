@@ -43,6 +43,12 @@ def main():
     app.setOrganizationName("HSTL")
     app.setStyle("Fusion")
 
+    # Single-instance guard — raise existing window and exit if already running
+    from gui.single_instance import SingleInstanceGuard
+    guard = SingleInstanceGuard()
+    if not guard.try_acquire():
+        sys.exit(0)
+
     # Capture base font size before any zoom is applied
     from gui.zoom_manager import ZoomManager
     ZoomManager.instance().initialize_base_font(app)
@@ -63,6 +69,9 @@ def main():
     window = MainWindow()
     window.setWindowIcon(icon)
     window.show()
+
+    guard.connect_window(window)
+    app.aboutToQuit.connect(guard.release)
 
     # Windows: fix taskbar icon
     if sys.platform.startswith("win"):

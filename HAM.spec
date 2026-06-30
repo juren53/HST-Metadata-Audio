@@ -12,6 +12,7 @@ hiddenimports = [
     'PyQt6.QtCore',
     'PyQt6.QtGui',
     'PyQt6.QtWidgets',
+    'PyQt6.QtNetwork',
     'PyQt6.sip',
     # Third-party
     'mutagen',
@@ -35,6 +36,7 @@ hiddenimports = [
     '__init__',
     'gui',
     'gui.main_window',
+    'gui.single_instance',
     'gui.theme',
     'gui.zoom_manager',
     'gui.widgets',
