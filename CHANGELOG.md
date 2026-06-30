@@ -11,6 +11,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## HAM [0.2.1] - 2026-06-29 2005 CDT
+
+### Added
+- **Step 5 implemented** (`steps/step5_validation.py`) — Output Validation
+  & Reporting; full pipeline is now complete (all 5 steps operational):
+  - Per-file checks: file size bounds (10 KB – 100 MB), valid ID3 header,
+    required frames (TIT2, TALB, TPE1, TRDA, TCON), APIC front-cover present
+  - Cross-references TALB and TIT2 against `csv_records` when available in
+    context (catches embed mismatches between Steps 2 and 3)
+  - Writes timestamped `reports/step5_report_YYYYMMDD_HHMMSS.txt` with
+    PASS/FAIL per file, field readback (title, date, art size), and ERROR
+    lines for each failure
+  - Stores `validation_passed` and `validation_report` path in context;
+    `validate_outputs` surfaces warnings if any file failed
+
+---
+
 ## HAM [0.2.0] - 2026-06-29 2001 CDT
 
 ### Added
