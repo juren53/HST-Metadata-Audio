@@ -11,6 +11,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## HAM [0.1.9] - 2026-06-29 1931 CDT
+
+### Added
+- **Single-instance guard with window raise failover** (`gui/single_instance.py`):
+  - Uses `QLocalServer` / `QLocalSocket` — second launch connects to the
+    running instance, sends a `"raise"` signal, and exits silently (no dialog)
+  - Primary instance receives the signal, un-minimises if needed, and calls
+    `raise_()` / `activateWindow()` to come to the foreground
+  - Replaces the HPM pattern (error popup + exit) with a smooth failover
+  - `HAM.spec` updated: `PyQt6.QtNetwork` and `gui.single_instance` added
+    to `hiddenimports`
+
+---
+
 ## HAM [0.1.8] - 2026-06-29 1732 CDT
 
 ### Added
