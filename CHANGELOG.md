@@ -11,6 +11,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## HAM [0.2.3] - 2026-06-29 2047 CDT
+
+### Fixed
+- **Step logging now reaches the GUI and log files** — previously `log_to_gui`
+  was a no-op and no file handler was attached, so step failures were silent
+  in the app:
+  - `utils/qt_log_handler.py` (new): `QtLogHandler` — a `QObject` +
+    `logging.Handler` that emits each record as a `log_record(msg, level)`
+    Qt signal
+  - `gui/main_window.py`: `_wire_log_handler()` creates the handler, connects
+    its signal to `LogWidget.append`, attaches it to the root `"ham"` logger
+    (all system messages captured), and passes it to `StepWidget`
+  - `gui/widgets/step_widget.py`: `set_log_handler()` stores the handler;
+    `_run_step()` now creates a unique per-run logger with a file handler
+    writing to `<batch>/logs/step{N}_<timestamp>.log` plus the GUI handler;
+    `log_to_gui()` emits via the handler signal instead of silently passing
+
+---
+
 ## HAM [0.2.2] - 2026-06-29 2033 CDT
 
 ### Fixed
