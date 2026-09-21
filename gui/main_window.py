@@ -31,7 +31,7 @@ from gui.widgets.step_widget import StepWidget
 from gui.widgets.batch_info_panel import BatchInfoPanel
 from gui.widgets.log_widget import LogWidget
 from gui.dialogs.new_batch_dialog import NewBatchDialog
-from utils.qt_log_handler import QtLogHandler
+from utils.log_manager import LogManager
 from gui.theme import DEFAULT_THEME, get_theme_registry, get_fusion_palette, is_dark_theme
 from gui.zoom_manager import ZoomManager
 from pyqt_app_info import AppIdentity, ToolRegistry, gather_info
@@ -123,12 +123,14 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self.log_widget, "Logs")
 
     def _wire_log_handler(self):
-        """Create a QtLogHandler, attach it to the root ham logger and StepWidget."""
-        self._qt_log_handler = QtLogHandler(parent=self)
+        """Set up LogManager (ported from HPM's utils/log_manager.py) and wire
+        its singleton GUI handler to the LogWidget and StepWidget."""
+        self.log_manager = LogManager.instance()
+        session_log_dir = Path.home() / ".hstl_audio_framework" / "logs"
+        self.log_manager.setup_session_logging(session_log_dir, verbosity="normal")
+
+        self._qt_log_handler = self.log_manager.get_gui_handler()
         self._qt_log_handler.log_record.connect(self.log_widget.append)
-        # Capture all messages from the top-level ham logger
-        import logging
-        logging.getLogger("ham").addHandler(self._qt_log_handler)
         self.step_widget.set_log_handler(self._qt_log_handler)
 
     # ──────────────────────────────────────────────────────────────────────
@@ -273,7 +275,11 @@ class MainWindow(QMainWindow):
         self.step_widget.set_batch(self.current_config, batch_id, batch_info)
         self.batch_info_panel.set_batch(self.current_config, batch_id, batch_info)
 
-        self.log_widget.append(f"Selected batch: {batch_info['name']}")
+        data_dir = Path(batch_info.get("data_directory", ""))
+        if data_dir.exists():
+            self.log_manager.setup_batch_logging(batch_id, data_dir)
+
+        self.log_manager.info(f"Selected batch: {batch_info['name']}", batch_id=batch_id)
         self.status_bar.showMessage(f"Current batch: {batch_info['name']}")
         self.tabs.setCurrentIndex(1)
 

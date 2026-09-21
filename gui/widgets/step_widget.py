@@ -162,6 +162,14 @@ class StepWidget(QWidget):
         if self._qt_log_handler is not None:
             logger.addHandler(self._qt_log_handler)
 
+        # Also feed the batch's consolidated log file, if LogManager has one
+        # set up for this batch (this per-run logger isn't a child of the
+        # shared "ham" logger, so it won't inherit that handler otherwise).
+        from utils.log_manager import LogManager
+        batch_handler = LogManager.instance().get_batch_handler(self.batch_id)
+        if batch_handler is not None:
+            logger.addHandler(batch_handler)
+
         context = ProcessingContext(paths, self.config, logger, batch_id=self.batch_id)
         step = _STEP_CLASSES[step_num]()
 

@@ -11,6 +11,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## HAM [0.2.5] - 2026-09-21 1454 CDT
+
+### Added
+- **`utils/log_manager.py`** (new) — `LogManager` singleton, ported from
+  HPM's `utils/log_manager.py`
+  (`Photos/Version-2/Framework/utils/log_manager.py`):
+  - `setup_session_logging()` — one rotating log file per app run, at
+    `~/.hstl_audio_framework/logs/session_<timestamp>.log` (mirrors HPM's
+    `~/.hstl_photo_framework/logs/` convention)
+  - `setup_batch_logging()` — a consolidated, rotating `batch_<id>.log`
+    per batch, created when a batch is selected
+  - `get_gui_handler()` — a singleton GUI handler, now owned by
+    `LogManager` instead of created ad hoc in `main_window.py`
+  - `debug`/`info`/`warning`/`error`/`success`/`critical` and
+    `step_start`/`step_complete`/`step_error` convenience methods,
+    matching HPM's API
+  - Adapted rather than copied 1:1: reuses HAM's existing
+    `utils/qt_log_handler.QtLogHandler` (`(message, level)` signal,
+    matching `LogWidget.append()`) instead of porting HPM's richer
+    `LogRecord`/`GUILogHandler` dataclass — that belongs with a future
+    `LogViewerDialog` port, noted in the dev plan's Next Steps
+
+### Changed
+- **`gui/main_window.py`**: `_wire_log_handler()` now sets up
+  `LogManager` (session logging + GUI handler) instead of creating a
+  `QtLogHandler` directly; `_on_batch_selected()` now calls
+  `log_manager.setup_batch_logging()` and logs batch selection through
+  `LogManager` instead of appending directly to `LogWidget`
+- **`gui/widgets/step_widget.py`**: `_run_step()` now also attaches the
+  active batch's `LogManager` handler (via `get_batch_handler()`) to the
+  per-run step logger, so step messages land in the batch's consolidated
+  log file in addition to the existing per-run
+  `step{N}_<timestamp>.log` file (unchanged since v0.2.3)
+  - **Files Modified**: `docs/HSTL_Audio_Framework-Development_Plan.md`
+    (marked LogManager item complete in the HPM component-mapping table
+    and Next Steps)
+
+---
+
 ## HAM [0.2.4] - 2026-09-21 1435 CDT
 
 ### Added

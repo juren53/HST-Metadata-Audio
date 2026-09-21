@@ -1,6 +1,6 @@
 # HSTL Audio Metadata Framework - Development Plan
 
-Updated: 2026-09-21 1435 CDT
+Updated: 2026-09-21 1454 CDT
 
 ## Project Overview
 
@@ -41,7 +41,7 @@ HAM reuses HPM's design **directly**, adapted to audio/MP3 instead of photo/TIFF
 | `gui/widgets/config_widget.py` — `ConfigWidget`   | *(none yet)*                                 | **Not ported** — Configuration tab is a placeholder in `main_window.py` |
 | `gui/dialogs/settings_dialog.py` — `SettingsDialog` | *(none yet)*                                 | **Not ported**                                                       |
 | `gui/dialogs/log_viewer_dialog.py`                | *(none yet)*                                 | **Not ported**                                                       |
-| `utils/log_manager.py` — `LogManager` Singleton (session + per-batch + GUI-signal logging, verbosity control) | `utils/qt_log_handler.py` (`QtLogHandler`, wired ad hoc in `main_window.py`/`step_widget.py`) | **Partially ported** — v0.2.3 wired step logging to the GUI and per-batch log files, but as direct signal wiring rather than a `LogManager` singleton. Consolidating into a `LogManager` matching HPM's design is the next infrastructure step. |
+| `utils/log_manager.py` — `LogManager` Singleton (session + per-batch + GUI-signal logging, verbosity control) | `utils/log_manager.py` — `LogManager` Singleton | **Ported** — session logging to `~/.hstl_audio_framework/logs/` (mirrors HPM's `~/.hstl_photo_framework/logs/`), a consolidated per-batch `batch_<id>.log` created on batch selection, and a singleton GUI handler now owned by `LogManager` instead of created ad hoc in `main_window.py`. Adapted rather than copied 1:1: reuses HAM's existing `QtLogHandler` (`(message, level)` signal, matching `LogWidget.append()`) instead of porting HPM's richer `LogRecord`/`GUILogHandler` dataclass — that belongs with a future `LogViewerDialog` port. Per-step-run log files (`step{N}_<timestamp>.log`, unchanged since v0.2.3) now additionally feed the batch's consolidated log via `LogManager.get_batch_handler()`. |
 | `step_widget.py` step execution on a `QThread` (keeps GUI responsive) | `gui/workers.py` — `StepRunner(QThread)`, used by `gui/widgets/step_widget.py._run_step()` | **Ported** — steps run on a background thread; `finished`/`error` signals drive `_on_step_finished`/`_on_step_error`; controls are disabled while a step runs (steps share the batch's `tmp/` working files) and "Run All" chains steps via the same signals instead of a blocking loop |
 | `tests/` — `unit/`, `integration/`, `gui/`, `conftest.py` fixtures | *(none yet)*                                 | **Not ported** — no `tests/` directory in HAM yet                    |
 | `utils/github_version_checker.py`, `git_updater.py` | *(none yet)*                                 | Not ported; lower priority — evaluate need before porting            |
@@ -73,6 +73,7 @@ C:\Users\juren\Projects\HST-Metadata\Audio\
 │   ├── __init__.py
 │   ├── logger.py                  # Logging utilities
 │   ├── qt_log_handler.py          # QtLogHandler — bridges logging records to Qt signals (GUI)
+│   ├── log_manager.py             # LogManager Singleton — session/batch/GUI logging (mirrors HPM)
 │   ├── validator.py               # Validation utilities
 │   ├── file_utils.py              # File operation utilities
 │   ├── path_manager.py            # Path management utilities
@@ -236,7 +237,7 @@ HAM's GUI is a direct port of HPM's PyQt6 GUI structure, not a fresh design:
 - **Dialogs** (`gui/dialogs/`) — modal dialogs for batch creation/inspection (`new_batch_dialog.py`, `batch_info_dialog.py`), same pattern as HPM's `gui/dialogs/`. HPM additionally has one dialog per step (`step1_dialog.py`…`step8_dialog.py`); HAM does not yet use per-step dialogs — evaluate whether Step 1-5 parameter configuration needs this pattern as the GUI matures.
 - **Singleton managers** — `ZoomManager` (ported directly) and theming (consumed via the shared `ThemeManager` package) follow HPM's Singleton pattern for app-wide, cross-widget state (`instance()` classmethod, `QSettings`-backed persistence, `pyqtSignal` change notifications).
 - **Observer pattern (Signals/Slots)** — widgets emit signals (e.g. `step_executed`, `batch_selected`) that `MainWindow` and sibling widgets subscribe to, decoupling GUI components exactly as HPM's SAD §8.3 describes.
-- **Gaps vs. HPM** (see table above for detail): no `ConfigWidget`/`SettingsDialog`/`LogViewerDialog` yet; no consolidated `LogManager` singleton (current logging is wired directly between `QtLogHandler` and `LogWidget`). Step execution is now ported to a `QThread` worker (`gui/workers.py`).
+- **Gaps vs. HPM** (see table above for detail): no `ConfigWidget`/`SettingsDialog`/`LogViewerDialog` yet. Step execution is ported to a `QThread` worker (`gui/workers.py`), and logging is now consolidated in a `LogManager` singleton (`utils/log_manager.py`).
 
 ## Process Steps Overview
 
@@ -289,7 +290,7 @@ HAM's GUI is a direct port of HPM's PyQt6 GUI structure, not a fresh design:
 The GUI is no longer a future phase — a PyQt6 `MainWindow` with the four HPM-pattern tabs is implemented and in active use. Remaining work, in priority order, ports specific HPM components rather than designing new ones:
 
 1. ~~**Background step execution**~~ — done: `gui/workers.py` (`StepRunner`) runs steps on a `QThread`, ported from HPM's `MetadataEmbeddingThread` pattern (`gui/dialogs/step5_dialog.py`)
-2. **`LogManager` singleton** — consolidate the current ad hoc `QtLogHandler` wiring (`main_window.py` / `step_widget.py`) into a `LogManager` singleton with session-level + per-batch logging and a GUI signal handler, matching HPM's `utils/log_manager.py`.
+2. ~~**`LogManager` singleton**~~ — done: `utils/log_manager.py`, ported from HPM's `utils/log_manager.py`; session logging, per-batch consolidated log files, and a singleton GUI handler now live in `LogManager` instead of ad hoc `main_window.py` wiring
 3. **Configuration tab** — implement `ConfigWidget` (currently a placeholder), porting HPM's `gui/widgets/config_widget.py`.
 4. **`SettingsDialog`** — port HPM's `gui/dialogs/settings_dialog.py` for app-level settings (theme, zoom, logging verbosity).
 5. **`LogViewerDialog`** — port HPM's `gui/dialogs/log_viewer_dialog.py` for browsing historical batch logs.
@@ -629,10 +630,10 @@ python hstl_audio.py batches
 ### Current Focus
 
 1. ~~Port HPM's `QThread` step-execution pattern into `StepWidget._run_step()`~~ — done (`gui/workers.py`)
-2. Consolidate logging into a `LogManager` singleton (port from HPM's `utils/log_manager.py`), replacing the current direct `QtLogHandler` wiring
+2. ~~Consolidate logging into a `LogManager` singleton~~ — done (`utils/log_manager.py`)
 3. Implement the Configuration tab (`ConfigWidget`, ported from HPM's `gui/widgets/config_widget.py`)
 4. Implement `SettingsDialog` (ported from HPM's `gui/dialogs/settings_dialog.py`)
-5. Implement `LogViewerDialog` (ported from HPM's `gui/dialogs/log_viewer_dialog.py`)
+5. Implement `LogViewerDialog` (ported from HPM's `gui/dialogs/log_viewer_dialog.py`) — will want `LogManager`'s GUI handler upgraded to HPM's `LogRecord`/`GUILogHandler` dataclass at that point, to support level/batch/step filtering
 
 ### Upcoming
 
@@ -657,4 +658,4 @@ python hstl_audio.py batches
 - Data directories separate from framework code location
 - GUI-first in practice: `run.ps1` launches `ham_gui.py` directly; the CLI (`hstl_audio.py`) remains available for scripting/automation, following HPM's dual-interface approach
 
-Updated: 2026-09-21 1435 CDT (Ported HPM's QThread step-execution pattern — see `gui/workers.py` — the first item worked off the HPM component-mapping table below; earlier revision documented HAM's dependence on HPM's proven design patterns, corrected stale "CLI first, GUI Phase 2" framing, and added the HPM component-mapping table and GUI architecture section)
+Updated: 2026-09-21 1454 CDT (Ported HPM's LogManager singleton — see `utils/log_manager.py` — the second item worked off the HPM component-mapping table below; earlier revisions ported the QThread step-execution pattern and documented HAM's dependence on HPM's proven design patterns)
