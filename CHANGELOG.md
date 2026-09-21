@@ -11,6 +11,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## HAM [0.2.4] - 2026-09-21 1435 CDT
+
+### Added
+- **`gui/workers.py`** (new) — `StepRunner(QThread)`, ported from HPM's per-step
+  `QThread` worker pattern (`MetadataEmbeddingThread` in
+  `Photos/Version-2/Framework/gui/dialogs/step5_dialog.py`). Runs a single
+  `StepProcessor` off the UI thread and reports the outcome via `finished`
+  (step_num, `StepResult`) / `error` (step_num, message) signals.
+
+### Changed
+- **`gui/widgets/step_widget.py`**: `_run_step()` now dispatches to a
+  `StepRunner` instead of calling `step.run(context)` synchronously on the
+  UI thread — resolves the `TODO: run in a QThread` marker from v0.2.3.
+  - New `_on_step_finished()` / `_on_step_error()` slots handle the
+    terminal outcome (GUI log, status refresh, `step_executed` signal)
+  - Step buttons and "Run All" are disabled while any step is running,
+    since steps share the batch's `tmp/` working files and must not
+    overlap
+  - `_run_all()` no longer loops synchronously; it starts the next
+    incomplete step and `_continue_run_all()` chains to the following
+    step from the `finished` signal, stopping on failure
+  - **Files Modified**: `docs/HSTL_Audio_Framework-Development_Plan.md`
+    (marked QThread item complete in the HPM component-mapping table and
+    Next Steps)
+
+---
+
 ## HAM [0.2.3] - 2026-06-29 2047 CDT
 
 ### Fixed

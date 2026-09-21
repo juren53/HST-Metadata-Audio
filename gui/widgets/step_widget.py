@@ -4,7 +4,9 @@ Step Widget for HAM GUI.
 Displays the 5-step pipeline for the currently selected batch and
 lets the user run individual steps.
 
-STUB – UI skeleton implemented; step execution hooks are placeholders.
+Step execution runs on a background QThread (gui.workers.StepRunner) so
+the UI stays responsive during long steps, ported from HPM's per-step
+QThread worker pattern (Photos/Version-2/Framework/gui/dialogs/step5_dialog.py).
 """
 
 from PyQt6.QtWidgets import (
@@ -36,6 +38,8 @@ class StepWidget(QWidget):
         self._step_btns: dict = {}
         self._step_status: dict = {}
         self._qt_log_handler = None   # set via set_log_handler()
+        self._active_runners: dict = {}  # step_num -> StepRunner (keeps it alive)
+        self._run_all_active = False
         self._init_ui()
 
     def set_log_handler(self, handler):
@@ -65,10 +69,10 @@ class StepWidget(QWidget):
 
         layout.addStretch()
 
-        run_all_btn = QPushButton("Run All Steps (from next incomplete)")
-        run_all_btn.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
-        run_all_btn.clicked.connect(self._run_all)
-        layout.addWidget(run_all_btn, alignment=Qt.AlignmentFlag.AlignLeft)
+        self.run_all_btn = QPushButton("Run All Steps (from next incomplete)")
+        self.run_all_btn.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        self.run_all_btn.clicked.connect(self._run_all)
+        layout.addWidget(self.run_all_btn, alignment=Qt.AlignmentFlag.AlignLeft)
 
     def _build_step_row(self, step_num: int) -> QGroupBox:
         group = QGroupBox(f"Step {step_num}: {_STEP_LABELS[step_num]}")
@@ -100,9 +104,8 @@ class StepWidget(QWidget):
         self.batch_info = batch_info
         name = batch_info.get("name", "Unnamed")
         self.batch_label.setText(f"Batch: {name}")
-        for btn in self._step_btns.values():
-            btn.setEnabled(True)
         self._refresh_step_status()
+        self._refresh_button_states()
 
     def _refresh_step_status(self):
         if self.config is None:
@@ -125,8 +128,7 @@ class StepWidget(QWidget):
     # ──────────────────────────────────────────────────────────────────────
 
     def _run_step(self, step_num: int):
-        # TODO: run in a QThread so the GUI stays responsive during long steps
-        if self.config is None:
+        if self.config is None or step_num in self._active_runners:
             return
         import time
         from pathlib import Path
@@ -138,6 +140,7 @@ class StepWidget(QWidget):
         from steps.step3_metadata_embed import Step3_MetadataEmbed
         from steps.step4_thumbnail_embed import Step4_ThumbnailEmbed
         from steps.step5_validation import Step5_Validation
+        from gui.workers import StepRunner
 
         _STEP_CLASSES = {
             1: Step1_CSVPrep,
@@ -160,30 +163,70 @@ class StepWidget(QWidget):
             logger.addHandler(self._qt_log_handler)
 
         context = ProcessingContext(paths, self.config, logger, batch_id=self.batch_id)
-
         step = _STEP_CLASSES[step_num]()
-        result = step.run(context)
 
+        status_lbl = self._step_status[step_num]
+        status_lbl.setText("⏳ Running…")
+        status_lbl.setStyleSheet("color: #2196f3; font-weight: bold;")
+
+        runner = StepRunner(step_num, step, context, parent=self)
+        runner.finished.connect(self._on_step_finished)
+        runner.error.connect(self._on_step_error)
+        self._active_runners[step_num] = runner
+        self._refresh_button_states()
+        runner.start()
+
+    def _on_step_finished(self, step_num: int, result):
+        self._active_runners.pop(step_num, None)
         level = "INFO" if result.success else "ERROR"
         self.log_to_gui(
             f"Step {step_num}: {'OK' if result.success else 'FAILED'} — {result.message}",
             level,
         )
         self._refresh_step_status()
+        self._refresh_button_states()
         self.step_executed.emit(step_num, result.success)
+        if self._run_all_active:
+            self._continue_run_all(step_num, result.success)
+
+    def _on_step_error(self, step_num: int, message: str):
+        self._active_runners.pop(step_num, None)
+        self.log_to_gui(f"Step {step_num}: FAILED — {message}", "ERROR")
+        self._refresh_step_status()
+        self._refresh_button_states()
+        self.step_executed.emit(step_num, False)
+        if self._run_all_active:
+            self._run_all_active = False
+
+    def _refresh_button_states(self):
+        """Disable step controls while any step is running (steps share
+        the batch's tmp/ working files, so only one may run at a time)."""
+        running = bool(self._active_runners)
+        has_batch = self.config is not None
+        for btn in self._step_btns.values():
+            btn.setEnabled(has_batch and not running)
+        self.run_all_btn.setEnabled(has_batch and not running)
 
     def _run_all(self):
-        if self.config is None:
+        if self.config is None or self._run_all_active or self._active_runners:
             return
         next_step = self.config.get_next_step()
         if next_step is None:
             from PyQt6.QtWidgets import QMessageBox
             QMessageBox.information(self.parent(), "Done", "All steps already completed!")
             return
-        for step_num in range(next_step, 6):
-            self._run_step(step_num)
-            if not self.config.get_step_status(step_num):
-                break
+        self._run_all_active = True
+        self._run_step(next_step)
+
+    def _continue_run_all(self, completed_step_num: int, success: bool):
+        if not success:
+            self._run_all_active = False
+            return
+        next_step = self.config.get_next_step()
+        if next_step is None or next_step <= completed_step_num:
+            self._run_all_active = False
+            return
+        self._run_step(next_step)
 
     def log_to_gui(self, msg: str, level: str = "INFO"):
         """Forward a message to the GUI log via the QtLogHandler signal."""
