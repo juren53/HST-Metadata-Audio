@@ -1,8 +1,12 @@
 # HSTL Audio Metadata Framework - Development Plan
 
+Updated: 2026-09-21 1429 CDT
+
 ## Project Overview
 
-The HSTL Audio Framework is an application that orchestrates all components of the HSTL Audio Metadata Project. It manages the complete process from CSV metadata preparation through final tagged MP3 creation, embedding audio metadata and custom album art thumbnails into the Harry S. Truman Library sound recordings collection.
+The HSTL Audio Framework (HAM) is an application that orchestrates all components of the HSTL Audio Metadata Project. It manages the complete process from CSV metadata preparation through final tagged MP3 creation, embedding audio metadata and custom album art thumbnails into the Harry S. Truman Library sound recordings collection.
+
+HAM is the second application in the HSTL metadata framework family. It follows **HPM (HSTL Photo Metadata)** — a PyQt6 desktop application that is delivered and working in production for the customer, orchestrating an 8-step photo processing pipeline. HAM is deliberately **not** a from-scratch design: wherever HAM's problem shape matches HPM's, HAM adopts HPM's already-proven architecture, module layout, and GUI patterns rather than inventing new ones. See [Relationship to HPM](#relationship-to-hpm-predecessor-framework) below.
 
 ## Repository Information
 
@@ -10,20 +14,56 @@ The HSTL Audio Framework is an application that orchestrates all components of t
 - **Branch**: `master` (main branch)
 - **Local Repository**: `C:\Users\juren\Projects\HST-Metadata`
 - **Audio Project Path**: `Audio/`
-- **Current Status**: Active testing and development (script version 0.12d; Mutagen adopted for metadata embedding)
+- **Predecessor Reference**: `C:\Users\juren\Projects\HST-Metadata\Photos\Version-2\Framework` (HPM — delivered, in production; the canonical reference implementation for framework and GUI patterns)
+- **Current Status**: Active development, v0.2.3. Core pipeline (CLI + 5 steps), config/path/batch-registry infrastructure, and a PyQt6 GUI (4-tab `MainWindow` mirroring HPM's layout) are implemented. Several HPM-proven GUI/infrastructure components have not yet been ported — see [GUI Architecture](#gui-architecture-from-hpm) and [Next Steps](#next-steps).
 
-## Project Structure (Proposed Framework)
+## Relationship to HPM (Predecessor Framework)
+
+HPM (`Photos/Version-2/Framework`) already solved the general problem HAM faces: *ingest a metadata spreadsheet, walk a numbered pipeline of validation/transform/embed steps against a batch of source files, track multi-batch progress, and expose it all through both a CLI and a PyQt6 GUI.* It is delivered to the customer and has a 296-test regression suite (`Photos/Version-2/Framework/tests/`) and a `docs/SOFTWARE_ARCHITECTURE.md` documenting its component design and design patterns (Singleton, Template Method, Observer/Signals-Slots, Context Object, Strategy).
+
+HAM reuses HPM's design **directly**, adapted to audio/MP3 instead of photo/TIFF:
+
+| HPM Component (proven)                         | HAM Equivalent                              | Status                                                             |
+| ------------------------------------------------ | -------------------------------------------- | ------------------------------------------------------------------- |
+| `steps/base_step.py` — `StepProcessor` (ABC, Template Method), `ProcessingContext`, `StepResult` | `steps/base_step.py`                         | Ported — same Template Method (`validate_inputs` → `execute` → `validate_outputs`) |
+| `core/pipeline.py` — `Pipeline` orchestrator      | `core/pipeline.py`                           | Ported                                                               |
+| `config/config_manager.py` — dot-notation YAML config | `config/config_manager.py`                   | Ported                                                               |
+| `utils/path_manager.py` — `PathManager`           | `utils/path_manager.py`                      | Ported                                                               |
+| `utils/batch_registry.py` — `BatchRegistry`, batch lifecycle (active/completed/archived) | `utils/batch_registry.py`                    | Ported                                                               |
+| `utils/validator.py` — `Validator`, `ValidationResult` (Strategy pattern) | `utils/validator.py`                         | Ported                                                               |
+| `utils/file_utils.py`                             | `utils/file_utils.py`                        | Ported                                                               |
+| `gui/main_window.py` — 4-tab `QMainWindow` (Batches / Current Batch / Configuration / Logs) | `gui/main_window.py`                         | Ported — same tab structure; Configuration tab still a placeholder   |
+| `gui/widgets/step_widget.py`, `batch_list_widget.py`, `log_widget.py` | `gui/widgets/` (same filenames + `batch_info_panel.py`) | Ported                                                               |
+| `gui/dialogs/new_batch_dialog.py`, `batch_info_dialog.py` | `gui/dialogs/` (same filenames)              | Ported                                                               |
+| `gui/zoom_manager.py` — `ZoomManager` Singleton (font-scale, `QSettings`) | `gui/zoom_manager.py`                        | Ported — explicitly mirrors HPM's implementation                     |
+| `gui/theme_manager.py` — `ThemeManager` Singleton | `gui/theme.py` (thin wrapper)                | **Adapted, not duplicated** — HPM's theme system was extracted into the standalone `~/Projects/ThemeManager` package; HAM consumes that shared package instead of re-implementing it in-repo |
+| (n/a in HPM directly — single-instance guard was factored out separately) | `gui/single_instance.py`                     | Uses the shared `single-instance-guard` package (`github.com/juren53/single-instance-guard`); silent raise-existing-window UX preference is documented in [[feedback_single_instance_ux]] |
+| `gui/widgets/config_widget.py` — `ConfigWidget`   | *(none yet)*                                 | **Not ported** — Configuration tab is a placeholder in `main_window.py` |
+| `gui/dialogs/settings_dialog.py` — `SettingsDialog` | *(none yet)*                                 | **Not ported**                                                       |
+| `gui/dialogs/log_viewer_dialog.py`                | *(none yet)*                                 | **Not ported**                                                       |
+| `utils/log_manager.py` — `LogManager` Singleton (session + per-batch + GUI-signal logging, verbosity control) | `utils/qt_log_handler.py` (`QtLogHandler`, wired ad hoc in `main_window.py`/`step_widget.py`) | **Partially ported** — v0.2.3 wired step logging to the GUI and per-batch log files, but as direct signal wiring rather than a `LogManager` singleton. Consolidating into a `LogManager` matching HPM's design is the next infrastructure step. |
+| `step_widget.py` step execution on a `QThread` (keeps GUI responsive) | `gui/widgets/step_widget.py` runs steps synchronously on the UI thread | **Not ported** — marked with a `TODO: run in a QThread` comment      |
+| `tests/` — `unit/`, `integration/`, `gui/`, `conftest.py` fixtures | *(none yet)*                                 | **Not ported** — no `tests/` directory in HAM yet                    |
+| `utils/github_version_checker.py`, `git_updater.py` | *(none yet)*                                 | Not ported; lower priority — evaluate need before porting            |
+| `core/delivery_service.py`                        | *(none yet — no HAM equivalent workflow yet)* | Evaluate once Step 5 delivery/output requirements are finalized      |
+
+**Working rule for HAM development**: before designing a new piece of framework or GUI infrastructure, check whether HPM already has a working, delivered version of it (`Photos/Version-2/Framework/`). Port and adapt rather than redesign. Where HPM later factored a component into a standalone shared package (ThemeManager, single-instance-guard, Icon_Manager_Module), prefer consuming the shared package over re-vendoring the code, as HAM already does for theming, single-instance behavior, and icon loading.
+
+## Project Structure (Current)
 
 ```
 C:\Users\juren\Projects\HST-Metadata\Audio\
-├── hstl_audio.py                  # Main CLI entry point
+├── hstl_audio.py                  # CLI entry point
+├── ham_gui.py                     # GUI launcher entry point
 ├── config/
 │   ├── __init__.py
-│   ├── config_manager.py          # Configuration management
-│   └── settings.py                # Default settings
+│   ├── config_manager.py          # Configuration management (dot-notation YAML)
+│   ├── settings.py                # Default settings
+│   ├── batch_registry.yaml        # Central batch registry (runtime data)
+│   └── project_config.yaml        # Example/default project config
 ├── steps/
 │   ├── __init__.py
-│   ├── base_step.py               # Base class for all steps
+│   ├── base_step.py               # StepProcessor (ABC), ProcessingContext, StepResult
 │   ├── step1_csv_prep.py          # CSV metadata preparation & validation
 │   ├── step2_csv_validation.py    # Date conversion & field validation
 │   ├── step3_metadata_embed.py    # Mutagen metadata tag embedding
@@ -32,25 +72,48 @@ C:\Users\juren\Projects\HST-Metadata\Audio\
 ├── utils/
 │   ├── __init__.py
 │   ├── logger.py                  # Logging utilities
+│   ├── qt_log_handler.py          # QtLogHandler — bridges logging records to Qt signals (GUI)
 │   ├── validator.py               # Validation utilities
 │   ├── file_utils.py              # File operation utilities
 │   ├── path_manager.py            # Path management utilities
-│   └── batch_registry.py         # Multi-batch registry management
+│   └── batch_registry.py          # Multi-batch registry management
 ├── core/
 │   ├── __init__.py
 │   └── pipeline.py                # Pipeline orchestration system
-├── gui/                           # Future PyQt6 GUI (Phase 2)
-│   └── __init__.py
+├── gui/                            # PyQt6 GUI
+│   ├── __init__.py
+│   ├── main_window.py             # MainWindow — 4-tab layout (mirrors HPM)
+│   ├── theme.py                   # Thin wrapper around the shared ThemeManager package
+│   ├── zoom_manager.py            # ZoomManager Singleton (mirrors HPM)
+│   ├── single_instance.py         # SingleInstanceGuard (shared single-instance-guard package)
+│   ├── resources/icons/           # App icons
+│   ├── widgets/
+│   │   ├── __init__.py
+│   │   ├── batch_list_widget.py
+│   │   ├── batch_info_panel.py
+│   │   ├── step_widget.py
+│   │   └── log_widget.py
+│   └── dialogs/
+│       ├── __init__.py
+│       ├── new_batch_dialog.py
+│       └── batch_info_dialog.py
 ├── assets/
 │   └── HST-thumbnail-c.png        # Base thumbnail image
-├── requirements.txt               # Python dependencies
-├── docs/DEVELOPMENT_PLAN.md       # This file
-└── README.md                      # Usage documentation
+├── tests/                         # (planned — not yet present; see HPM's tests/ for the target shape)
+├── requirements.txt                # Python dependencies
+├── run.ps1                         # venv bootstrap + launcher (GUI)
+├── HAM.spec                        # PyInstaller build spec
+├── version_info.txt                # Windows executable version resource
+├── docs/HSTL_Audio_Framework-Development_Plan.md  # This file
+├── CHANGELOG.md
+└── README.md                       # Usage documentation
 ```
 
 ## Architecture & Best Practices
 
 ### Core Architecture Patterns
+
+These patterns are adopted directly from HPM's `docs/SOFTWARE_ARCHITECTURE.md` §8 (Design Patterns), applied to the audio domain.
 
 #### Plugin/Extension Architecture
 
@@ -59,9 +122,10 @@ C:\Users\juren\Projects\HST-Metadata\Audio\
 - **Extensibility**: Easy to add, remove, or replace individual steps without affecting others
 - **Isolation**: Each step operates independently with clear input/output contracts
 
-#### Pipeline/Workflow Pattern
+#### Pipeline/Workflow Pattern (Template Method)
 
 - **Data Flow**: Model the 5-step process as a pipeline where data flows through stages
+- **Template Method**: `StepProcessor.run()` orchestrates `validate_inputs()` → `execute()` → `validate_outputs()` for every step, identically to HPM's `steps/base_step.py`
 - **Stage Validation**: Each stage validates its inputs before execution
 - **Checkpoints**: Validation points between stages
 - **State Tracking**: Maintain processing state throughout the pipeline
@@ -79,7 +143,7 @@ C:\Users\juren\Projects\HST-Metadata\Audio\
 - **Batch Isolation**: Each batch has independent configuration and data directories
 - **Progress Visibility**: View status and progress of all batches from any location
 - **Automatic Registration**: Batches auto-register on creation, no manual tracking needed
-- **Status Management**: Track batch lifecycle (active, completed, archived)
+- **Status Management**: Track batch lifecycle (active, completed, archived) — same three states as HPM
 
 ### Key Technical Practices
 
@@ -159,18 +223,29 @@ class BatchRegistry:
 - **File Count Validation**: Ensure expected number of files at each stage
 - **Metadata Verification**: Validate embedded metadata against source CSV data
 - **Tag Verification**: Read back embedded tags after writing to confirm accuracy
-- **Automated Testing**: Unit tests for each step module
+- **Automated Testing**: Unit tests for each step module (HPM's `tests/unit/`, `tests/integration/`, `tests/gui/` split is the target shape — see [Relationship to HPM](#relationship-to-hpm-predecessor-framework))
 - **Integration Testing**: End-to-end workflow validation
+
+## GUI Architecture (from HPM)
+
+HAM's GUI is a direct port of HPM's PyQt6 GUI structure, not a fresh design:
+
+- **`MainWindow`** — `QMainWindow` with a `QTabWidget` holding four tabs, same order as HPM: **Batches**, **Current Batch**, **Configuration**, **Logs**.
+- **Widgets** (`gui/widgets/`) — one reusable widget per tab concern (`batch_list_widget.py`, `step_widget.py`, `log_widget.py`), same split as HPM's `gui/widgets/`.
+- **Dialogs** (`gui/dialogs/`) — modal dialogs for batch creation/inspection (`new_batch_dialog.py`, `batch_info_dialog.py`), same pattern as HPM's `gui/dialogs/`. HPM additionally has one dialog per step (`step1_dialog.py`…`step8_dialog.py`); HAM does not yet use per-step dialogs — evaluate whether Step 1-5 parameter configuration needs this pattern as the GUI matures.
+- **Singleton managers** — `ZoomManager` (ported directly) and theming (consumed via the shared `ThemeManager` package) follow HPM's Singleton pattern for app-wide, cross-widget state (`instance()` classmethod, `QSettings`-backed persistence, `pyqtSignal` change notifications).
+- **Observer pattern (Signals/Slots)** — widgets emit signals (e.g. `step_executed`, `batch_selected`) that `MainWindow` and sibling widgets subscribe to, decoupling GUI components exactly as HPM's SAD §8.3 describes.
+- **Gaps vs. HPM** (see table above for detail): no `ConfigWidget`/`SettingsDialog`/`LogViewerDialog` yet; step execution still runs on the UI thread rather than a `QThread` worker; no consolidated `LogManager` singleton (current logging is wired directly between `QtLogHandler` and `LogWidget`).
 
 ## Process Steps Overview
 
 | Step | Process                                        | Validation Required                                                                                      |
-| ---- | ---------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| 1    | Prepare CSV metadata file                      | Confirm required columns exist: title, Accession Number, Date, Restrictions, Description, Place, Speakers, Production and Copyright |
-| 2    | Validate & clean CSV data                      | Date format conversion (DD-MMM-YY → ISO 8601), field completeness check, unicode/encoding issues         |
-| 3    | Embed metadata tags into MP3 files             | Mutagen write success, MP3 count matches CSV row count, spot-check tags with external tool               |
-| 4    | Create & embed custom thumbnails               | Thumbnail generation success, final MP3 count matches input count                                        |
-| 5    | Output validation & reporting                  | Tag readback verification, file size sanity checks, summary report                                       |
+| ---- | ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| 1    | Prepare metadata file                           | Confirm required columns exist: title, Accession Number, Date, Restrictions, Description, Place, Speakers, Production and Copyright |
+| 2    | Validate & clean metadata to create CSV data    | Date format conversion (DD-MMM-YY → ISO 8601), field completeness check, unicode/encoding issues         |
+| 3    | Embed metadata tags into MP3 files              | Mutagen write success, MP3 count matches CSV row count, spot-check tags with external tool                 |
+| 4    | Create & embed custom album art                 | Thumbnail generation success, final MP3 count matches input count                                          |
+| 5    | Output validation & reporting                   | Tag readback verification, file size sanity checks, summary report                                         |
 
 ## Existing Code to Integrate
 
@@ -195,40 +270,36 @@ class BatchRegistry:
 
 ## Development Phases
 
-### Phase 1: Core Framework & CLI (Current Priority)
+### Phase 1: Core Framework & CLI — Complete
 
-1. **Framework Architecture**
+1. **Framework Architecture** — done
+   - CLI entry point (`hstl_audio.py`) with argparse
+   - Configuration management system (`config/config_manager.py`)
+   - Data directory management (`utils/path_manager.py`)
+   - Logging system (`utils/logger.py`, `utils/qt_log_handler.py`)
+   - Multi-batch registry system (`utils/batch_registry.py`)
 
-   - Main CLI entry point with argparse
-   - Configuration management system
-   - Project initialization and tracking
-   - Data directory management
-   - Logging and reporting system
-   - Multi-batch registry system
+2. **Step Integration** — all five steps implemented in `steps/`
 
-2. **Step Integration** (Priority Order)
+3. **Validation & Quality Assurance** — Mutagen/Pillow pre-flight checks, tag readback verification in place per step
 
-   - Step 2: CSV validation & date conversion (extract from `audio-tags-12d.py`)
-   - Step 3: Metadata embedding (reimplement using Mutagen; reference `audio-tags-12d.py` for tag mappings)
-   - Step 4: Thumbnail creation & embedding (reimplement using Pillow; reference FFmpeg `drawtext` logic in `audio-tags-12d.py` for positioning/font parameters)
-   - Step 1: CSV preparation & structural validation (incorporate `match-audio-files.py` logic; new implementation)
-   - Step 5: Output validation & reporting (new implementation)
+### Phase 2: GUI Implementation — In Progress (v0.2.3)
 
-3. **Validation & Quality Assurance**
+The GUI is no longer a future phase — a PyQt6 `MainWindow` with the four HPM-pattern tabs is implemented and in active use. Remaining work, in priority order, ports specific HPM components rather than designing new ones:
 
-   - CSV field validation
-   - Mutagen package availability check (Step 3)
-   - Pillow package availability check (Step 4)
-   - Tag readback verification utilities
-   - Summary report generation
+1. **Background step execution** — wrap `StepWidget._run_step()` in a `QThread` worker so long-running steps (large batches) don't block the UI, matching HPM's `step_widget.py` threading pattern.
+2. **`LogManager` singleton** — consolidate the current ad hoc `QtLogHandler` wiring (`main_window.py` / `step_widget.py`) into a `LogManager` singleton with session-level + per-batch logging and a GUI signal handler, matching HPM's `utils/log_manager.py`.
+3. **Configuration tab** — implement `ConfigWidget` (currently a placeholder), porting HPM's `gui/widgets/config_widget.py`.
+4. **`SettingsDialog`** — port HPM's `gui/dialogs/settings_dialog.py` for app-level settings (theme, zoom, logging verbosity).
+5. **`LogViewerDialog`** — port HPM's `gui/dialogs/log_viewer_dialog.py` for browsing historical batch logs.
+6. **Per-step dialogs (evaluate)** — decide whether Step 1-5 parameter configuration warrants HPM's per-step-dialog pattern (`step1_dialog.py`…`step8_dialog.py`) or is adequately served by the current step widget.
 
-### Phase 2: GUI Implementation (Future)
+### Phase 3: Testing & Packaging (Next)
 
-- PyQt6 interface development
-- Visual progress tracking
-- Interactive configuration
-- Integrated file browser
-- Real-time validation feedback
+- Stand up a `tests/` directory mirroring HPM's `unit/` / `integration/` / `gui/` split and `conftest.py` fixture pattern
+- Unit tests for each step module; integration tests using `two.csv` / `short.csv` / `audio.csv`
+- GUI smoke tests for `MainWindow` tab flows
+- `HAM.spec` (PyInstaller) build already exists — verify it stays in sync with HPM's `build_exe.ps1` / `HPM.spec` release process as the app grows
 
 ## Framework Implementation Architecture
 
@@ -338,6 +409,8 @@ hstl_audio.py validate --paths          # Validate all directory paths
 hstl_audio.py validate --dependencies   # Check mutagen (Step 3) and Pillow (Step 4) package dependencies
 ```
 
+> **Note**: `hstl_audio.py` (313 lines) implements the core of this surface today (`init`, `batches`, `run`, `status`, `validate --dependencies`). Treat the remaining subcommands above as the target CLI surface, not all as already implemented — verify against the current `argparse` wiring before documenting a command as available in user-facing docs.
+
 ### Configuration Options
 
 ```bash
@@ -405,30 +478,30 @@ validation:
 The following metadata fields are embedded into each MP3 file using Mutagen. This table reflects the current mapping from ATW:
 
 | ID3 Tag / Frame    | Description              | Source / Value                                                        | Mutagen Notes                          |
-| ------------------ | ------------------------ | --------------------------------------------------------------------- | -------------------------------------- |
-| TIT2               | Title                    | title (CSV)                                                           | Native frame                           |
-| TIT1               | Grouping                 | (static) NARA-HST-SRC Sound Recordings Collection                    | Native frame                           |
-| TIT3               | Subtitle/Description     | Description + Date (CSV)                                              | Native frame                           |
-| COMM               | Comment                  | Description + Date (CSV)                                              | Native frame                           |
-| TXXX:ISBJ          | Subject                  | Description + Date (CSV)                                              | No native ID3 frame; write as TXXX     |
-| TALB               | Album / Accession No.    | Accession Number (CSV)                                                | Native frame                           |
-| TXXX:IPRD          | Product / Accession      | Accession Number (CSV)                                                | No native ID3 frame; write as TXXX     |
-| TPE1               | Artist                   | (static) Harry S. Truman Library                                      | Native frame                           |
-| IPLS               | Involved People          | Speakers (CSV) — **known issue in prototype: hardcoded; fix in HAM**  | ID3v2.3 only; requires `v2_version=3`  |
-| TCOP               | Copyright / Restrictions | Restrictions (CSV)                                                    | Native frame                           |
-| TPUB               | Publisher                | Production and Copyright (CSV)                                        | Native frame                           |
-| TSRC               | ISRC / Source            | (static) Harry S. Truman Library                                      | Native frame (prototype used key ISRC) |
-| TLOC               | Location                 | Place (CSV)                                                           | Non-standard; write as TXXX:TLOC       |
-| ICRD               | Creation Date (raw)      | Date original string (CSV)                                            | Write as TXXX:ICRD (RIFF/INFO key)     |
-| TDAT               | Date DDMM                | Date converted to DDMM                                                | ID3v2.3 only; requires `v2_version=3`  |
-| TYER               | Year                     | Date converted year (YYYY)                                            | ID3v2.3 only; requires `v2_version=3`  |
-| TORY               | Original Year            | Date converted year (YYYY)                                            | ID3v2.3 only; requires `v2_version=3`  |
-| TRDA               | Recording Date           | Date ISO 8601 (YYYY-MM-DD)                                            | ID3v2.3 only; requires `v2_version=3`  |
-| TOFN               | Original Filename        | Accession Number + .mp3                                               | Native frame                           |
-| TCON               | Genre                    | (static) speech                                                       | Native frame                           |
-| WOAS               | Source URL               | (static) https://www.trumanlibrary.gov/library/sound-recordings-collection | Native frame                      |
-| WXXX               | External URL             | (static) https://catalog.archives.gov/                                | Native frame                           |
-| TEXT               | Processing Note          | (static) script/tool version string                                   | Native frame                           |
+| ------------------ | ------------------------- | ----------------------------------------------------------------------- | ----------------------------------------- |
+| TIT2               | Title                     | title (CSV)                                                             | Native frame                              |
+| TIT1               | Grouping                  | (static) NARA-HST-SRC Sound Recordings Collection                       | Native frame                              |
+| TIT3               | Subtitle/Description      | Description + Date (CSV)                                                | Native frame                              |
+| COMM               | Comment                   | Description + Date (CSV)                                                | Native frame                              |
+| TXXX:ISBJ          | Subject                   | Description + Date (CSV)                                                | No native ID3 frame; write as TXXX        |
+| TALB               | Album / Accession No.     | Accession Number (CSV)                                                  | Native frame                              |
+| TXXX:IPRD          | Product / Accession       | Accession Number (CSV)                                                  | No native ID3 frame; write as TXXX        |
+| TPE1               | Artist                    | (static) Harry S. Truman Library                                        | Native frame                              |
+| IPLS               | Involved People           | Speakers (CSV) — **known issue in prototype: hardcoded; fix in HAM**    | ID3v2.3 only; requires `v2_version=3`     |
+| TCOP               | Copyright / Restrictions  | Restrictions (CSV)                                                      | Native frame                              |
+| TPUB               | Publisher                 | Production and Copyright (CSV)                                          | Native frame                              |
+| TSRC               | ISRC / Source             | (static) Harry S. Truman Library                                        | Native frame (prototype used key ISRC)    |
+| TLOC               | Location                  | Place (CSV)                                                             | Non-standard; write as TXXX:TLOC          |
+| ICRD               | Creation Date (raw)       | Date original string (CSV)                                              | Write as TXXX:ICRD (RIFF/INFO key)        |
+| TDAT               | Date DDMM                 | Date converted to DDMM                                                  | ID3v2.3 only; requires `v2_version=3`     |
+| TYER               | Year                      | Date converted year (YYYY)                                              | ID3v2.3 only; requires `v2_version=3`     |
+| TORY               | Original Year             | Date converted year (YYYY)                                              | ID3v2.3 only; requires `v2_version=3`     |
+| TRDA               | Recording Date            | Date ISO 8601 (YYYY-MM-DD)                                              | ID3v2.3 only; requires `v2_version=3`     |
+| TOFN               | Original Filename         | Accession Number + .mp3                                                 | Native frame                              |
+| TCON               | Genre                     | (static) speech                                                         | Native frame                              |
+| WOAS               | Source URL                | (static) https://www.trumanlibrary.gov/library/sound-recordings-collection | Native frame                           |
+| WXXX               | External URL              | (static) https://catalog.archives.gov/                                  | Native frame                              |
+| TEXT               | Processing Note           | (static) script/tool version string                                     | Native frame                              |
 
 > **Note:** Tags `dc:description`, `xmpDM:logComment`, `©cmt`, `©pub`, and `dc:publisher` from the ATW prototype are **not supported by Mutagen for MP3 files** (XMP and iTunes © tags are MP4-only in Mutagen). These were experimental additions in v0.12d and are excluded from the HAM framework tag set.
 
@@ -473,34 +546,26 @@ python hstl_audio.py batches
 
 ### Development Order
 
-1. **Core Framework Setup** (Priority 1)
+1. ~~**Core Framework Setup**~~ — Complete
+   - Project structure, CLI, config management, logging, batch registry, path management
 
-   - Project structure creation
-   - Basic CLI interface (argparse with subcommands)
-   - Configuration management (YAML-based with dot notation)
-   - Logging system
-   - Multi-batch registry system
-   - Path management utilities
+2. ~~**Step Modules**~~ — Complete
+   - Steps 1-5 implemented, referencing `audio-tags-12d.py` for tag mappings and `match-audio-files.py` for Step 1 pre-flight matching
 
-2. **Step Modules (Incremental)**
+3. **GUI Port from HPM** (Current) — see [Phase 2](#phase-2-gui-implementation--in-progress-v023) above: `QThread` step execution, `LogManager`, `ConfigWidget`, `SettingsDialog`, `LogViewerDialog`
 
-   - Step 2: CSV validation & date conversion (refactor from `audio-tags-12d.py`)
-   - Step 3: Metadata embedding (implement with Mutagen; reference `audio-tags-12d.py` for tag mappings)
-   - Step 4: Thumbnail creation & embedding (reimplement using Pillow; no FFmpeg dependency)
-   - Step 1: CSV preparation & structural validation (incorporate `match-audio-files.py` logic)
-   - Step 5: Output validation & reporting (new)
+4. **Integration Testing**
 
-3. **Integration Testing**
-
+   - Stand up `tests/` (unit/integration/gui) mirroring HPM's suite
    - End-to-end workflow with `two.csv` (2 records)
    - Expand to `short.csv` (8 records)
    - Full run with `audio.csv` (full dataset)
    - Error handling and recovery testing
 
-4. **Documentation & Polish**
+5. **Documentation & Polish**
 
-   - User documentation
-   - Developer documentation
+   - User documentation (consider mirroring HPM's `USER_GUIDE.md` / `GUI_QUICKSTART.md` / `GLOSSARY.md` split)
+   - Developer documentation (consider an HAM `SOFTWARE_ARCHITECTURE.md` once the GUI port settles, mirroring HPM's)
    - Error message improvements
    - CLI help system enhancement
 
@@ -518,6 +583,7 @@ python hstl_audio.py batches
 - **Context-Aware**: Centralized resource and state management throughout processing
 - **Resume-able**: Ability to restart from any step without losing progress
 - **Batch Isolation**: Each batch maintains independent configuration and data directories
+- **Reuse Proven Design**: When HAM's problem shape matches HPM's, port HPM's already-delivered solution rather than designing a new one (see [Relationship to HPM](#relationship-to-hpm-predecessor-framework))
 
 ## Dependencies
 
@@ -529,7 +595,8 @@ python hstl_audio.py batches
 - tqdm (progress bars)
 - pathlib (path handling)
 - csv, datetime, io (standard library)
-- PyQt6 (Phase 2 only)
+- PyQt6 (GUI)
+- Shared HSTL packages consumed at runtime (same pattern as HPM): `ThemeManager` (`~/Projects/ThemeManager`), `single-instance-guard`, `Icon_Manager_Module`
 
 ## Testing Strategy
 
@@ -540,6 +607,7 @@ python hstl_audio.py batches
 - Full-scale test with `audio.csv`
 - Mutagen tag-write validation (dry-run mode: build tag dict, verify keys/values without writing)
 - Tag readback verification after embedding (re-read with mutagen.id3.ID3 and compare to CSV)
+- Target shape: HPM's `tests/unit/`, `tests/integration/`, `tests/gui/`, `conftest.py` fixture split — HAM has no `tests/` directory yet (see Phase 3)
 
 ## Risk Mitigation
 
@@ -551,6 +619,7 @@ python hstl_audio.py batches
 - **MP3 File Missing**: Log missing files, skip with warning, continue batch
 - **Data Loss Prevention**: Copy to tmp/ before writing tags; originals never modified in place
 - **Performance**: Mutagen tag writes are fast (no audio re-encoding); progress bars for large batches (3,757 files)
+- **GUI Unresponsiveness**: Step execution currently runs on the UI thread; port HPM's `QThread` worker pattern before running large batches through the GUI (see Phase 2, item 1)
 
 ---
 
@@ -558,29 +627,26 @@ python hstl_audio.py batches
 
 ### Current Focus
 
-1. Create basic project structure
-2. Implement core CLI framework
-3. Add configuration management (YAML with dot notation)
-4. Implement logging system
-5. Build multi-batch registry system
-6. Create path management utilities
+1. Port HPM's `QThread` step-execution pattern into `StepWidget._run_step()` so long batches don't block the UI
+2. Consolidate logging into a `LogManager` singleton (port from HPM's `utils/log_manager.py`), replacing the current direct `QtLogHandler` wiring
+3. Implement the Configuration tab (`ConfigWidget`, ported from HPM's `gui/widgets/config_widget.py`)
+4. Implement `SettingsDialog` (ported from HPM's `gui/dialogs/settings_dialog.py`)
+5. Implement `LogViewerDialog` (ported from HPM's `gui/dialogs/log_viewer_dialog.py`)
 
 ### Upcoming
 
-1. Refactor Step 2: CSV validation & date conversion from `audio-tags-12d.py`
-2. Implement Step 3: Metadata embedding using Mutagen (tag mappings from `audio-tags-12d.py`)
-3. Implement Step 4: Thumbnail creation & embedding using Pillow (reference FFmpeg `drawtext` parameters in `audio-tags-12d.py` for positioning/font/color)
-4. Implement Step 1: CSV preparation & structural validation (incorporating `match-audio-files.py`)
-5. Implement Step 5: Output validation & reporting
-6. Build pipeline orchestration
-7. Add comprehensive error handling
-8. Fix IPLS tag: map to Speakers CSV column (currently hardcoded in prototype)
-9. Complete documentation
+1. Stand up `tests/` (`unit/`, `integration/`, `gui/`, `conftest.py`) mirroring HPM's test suite structure
+2. Fix IPLS tag: map to Speakers CSV column (currently hardcoded in prototype)
+3. Decide whether per-step dialogs (HPM's `step1_dialog.py`…`step8_dialog.py` pattern) are warranted for Steps 1-5
+4. Evaluate `github_version_checker.py` / `git_updater.py` for update-check parity with HPM, once HAM has its own release cadence established
+5. Complete documentation (consider an HAM `SOFTWARE_ARCHITECTURE.md` mirroring HPM's, once the GUI port from this plan settles)
 
 ## Notes
 
-- `audio-tags-12d.py` (v0.12d) is the proven prototype — extract logic into modules, don't rewrite
-- `match-audio-files.py` is a useful pre-flight utility to integrate into Step 1
+- `audio-tags-12d.py` (v0.12d) is the proven prototype for the audio-specific logic (dates, tag mappings) — extract logic into modules, don't rewrite
+- `match-audio-files.py` is a useful pre-flight utility integrated into Step 1
+- **HPM** (`Photos/Version-2/Framework`, delivered, in production) is the proven reference for everything *not* audio-specific — framework infrastructure, multi-batch registry, and GUI. Check it first before designing new HAM infrastructure; see [Relationship to HPM](#relationship-to-hpm-predecessor-framework)
+- Shared, previously-extracted HSTL packages (`ThemeManager`, `single-instance-guard`, `Icon_Manager_Module`) are consumed directly by HAM rather than re-implemented — the same packages HPM's own GUI patterns were factored out into
 - **Mutagen** handles all metadata tag writing (Step 3); no audio re-encoding, fast
 - **Pillow** handles Step 4 thumbnail generation (overlays accession number on base PNG using `ImageDraw`/`ImageFont`); no FFmpeg dependency
 - Step 4 is a single-pass pure-Python operation: Pillow generates JPEG in memory (`BytesIO`), Mutagen embeds it as `APIC` frame
@@ -588,6 +654,6 @@ python hstl_audio.py batches
 - Full production dataset: 3,757 MP3 files in `LIST_HSTL-Audio-Files.csv`
 - Windows PowerShell/bash environment
 - Data directories separate from framework code location
-- CLI implementation first, GUI in Phase 2
+- GUI-first in practice: `run.ps1` launches `ham_gui.py` directly; the CLI (`hstl_audio.py`) remains available for scripting/automation, following HPM's dual-interface approach
 
-Updated: 2026-05-04 (Step 4 thumbnail approach updated: Pillow replaces FFmpeg)
+Updated: 2026-09-21 1429 CDT (Revised to document HAM's dependence on HPM's proven design patterns; corrected stale "CLI first, GUI Phase 2" framing to reflect the GUI already in active development at v0.2.3; added HPM component-mapping table and GUI architecture section)
