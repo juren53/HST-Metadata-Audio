@@ -130,6 +130,8 @@ class MainWindow(QMainWindow):
         self.log_manager = LogManager.instance()
         session_log_dir = Path.home() / ".hstl_audio_framework" / "logs"
         self.log_manager.setup_session_logging(session_log_dir, verbosity="normal")
+        saved_verbosity = self.settings.value("logging/verbosity", "normal")
+        self.log_manager.set_verbosity(saved_verbosity)
 
         self._qt_log_handler = self.log_manager.get_gui_handler()
         self._qt_log_handler.log_record.connect(self.log_widget.append)
@@ -383,8 +385,8 @@ class MainWindow(QMainWindow):
         self.settings.setValue("theme/current", self.current_theme)
 
     def _show_settings(self):
-        # TODO: implement SettingsDialog
-        QMessageBox.information(self, "Settings", "Settings dialog — coming soon")
+        from gui.dialogs.settings_dialog import SettingsDialog
+        SettingsDialog(self).exec()
 
     # ──────────────────────────────────────────────────────────────────────
     # Zoom

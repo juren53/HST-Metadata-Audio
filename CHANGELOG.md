@@ -11,6 +11,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## HAM [0.2.7] - 2026-09-21 2333 CDT
+
+### Added
+- **`gui/dialogs/settings_dialog.py`** (new) — `SettingsDialog`, ported
+  from HPM's `gui/dialogs/settings_dialog.py`
+  (`Photos/Version-2/Framework/gui/dialogs/settings_dialog.py`), trimmed
+  to what HAM's infrastructure currently supports:
+  - **Appearance**: "Change Theme…" delegates to `MainWindow`'s existing
+    `_show_theme_dialog()` flow instead of porting a separate
+    `ThemeDialog` class
+  - **Logging**: verbosity level (minimal/normal/detailed), persisted
+    via `QSettings("HSTL", "AudioMetadata")` under `logging/verbosity`
+    and applied to `LogManager.set_verbosity()` on save
+  - **Not ported**: HPM's master logging enable/disable switch,
+    per-batch-logging toggle, console capture, and GUI log buffer size
+    — HAM's `LogManager`/`LogWidget` don't have the underlying
+    capabilities yet (`set_enabled`, `set_per_batch_logging`, console
+    capture, a bounded buffer), so those controls were left out rather
+    than wired to nothing
+
+### Changed
+- **`gui/main_window.py`**: `_show_settings()` now opens the real
+  `SettingsDialog` instead of the "coming soon" message box;
+  `_wire_log_handler()` now reads the persisted `logging/verbosity`
+  setting and applies it via `LogManager.set_verbosity()` at startup, so
+  the verbosity choice actually survives a restart
+  - **Files Modified**: `docs/HSTL_Audio_Framework-Development_Plan.md`
+    (marked SettingsDialog item complete in the HPM component-mapping
+    table and Next Steps)
+
+---
+
 ## HAM [0.2.6] - 2026-09-21 2330 CDT
 
 ### Added
