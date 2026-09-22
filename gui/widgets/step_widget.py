@@ -37,14 +37,14 @@ class StepWidget(QWidget):
         self.batch_info: dict = {}
         self._step_btns: dict = {}
         self._step_status: dict = {}
-        self._qt_log_handler = None   # set via set_log_handler()
+        self._gui_log_handler = None   # GUILogHandler, set via set_log_handler()
         self._active_runners: dict = {}  # step_num -> StepRunner (keeps it alive)
         self._run_all_active = False
         self._init_ui()
 
     def set_log_handler(self, handler):
-        """Wire a QtLogHandler so step log records reach the GUI and log file."""
-        self._qt_log_handler = handler
+        """Wire the shared GUILogHandler so step log records reach the GUI."""
+        self._gui_log_handler = handler
 
     def _init_ui(self):
         layout = QVBoxLayout(self)
@@ -159,13 +159,20 @@ class StepWidget(QWidget):
         log_file = paths.logs_dir / f"step{step_num}_{ts}.log"
         logger = get_logger(logger_name, log_file=log_file)
 
-        if self._qt_log_handler is not None:
-            logger.addHandler(self._qt_log_handler)
+        # Stamp batch_id/step onto every record this logger produces, so
+        # LogViewerDialog's batch/step filters have something to match —
+        # step implementations log via plain self.logger.info(...) without
+        # extra=, so without this filter every step record would otherwise
+        # arrive at the GUI as batch_id=step=None.
+        from utils.log_manager import LogManager, ContextFilter
+        logger.addFilter(ContextFilter(self.batch_id, step_num))
+
+        if self._gui_log_handler is not None:
+            logger.addHandler(self._gui_log_handler)
 
         # Also feed the batch's consolidated log file, if LogManager has one
         # set up for this batch (this per-run logger isn't a child of the
         # shared "ham" logger, so it won't inherit that handler otherwise).
-        from utils.log_manager import LogManager
         batch_handler = LogManager.instance().get_batch_handler(self.batch_id)
         if batch_handler is not None:
             logger.addHandler(batch_handler)
@@ -186,10 +193,11 @@ class StepWidget(QWidget):
 
     def _on_step_finished(self, step_num: int, result):
         self._active_runners.pop(step_num, None)
-        level = "INFO" if result.success else "ERROR"
+        level = "SUCCESS" if result.success else "ERROR"
         self.log_to_gui(
             f"Step {step_num}: {'OK' if result.success else 'FAILED'} — {result.message}",
             level,
+            step=step_num,
         )
         self._refresh_step_status()
         self._refresh_button_states()
@@ -199,7 +207,7 @@ class StepWidget(QWidget):
 
     def _on_step_error(self, step_num: int, message: str):
         self._active_runners.pop(step_num, None)
-        self.log_to_gui(f"Step {step_num}: FAILED — {message}", "ERROR")
+        self.log_to_gui(f"Step {step_num}: FAILED — {message}", "ERROR", step=step_num)
         self._refresh_step_status()
         self._refresh_button_states()
         self.step_executed.emit(step_num, False)
@@ -236,7 +244,21 @@ class StepWidget(QWidget):
             return
         self._run_step(next_step)
 
-    def log_to_gui(self, msg: str, level: str = "INFO"):
-        """Forward a message to the GUI log via the QtLogHandler signal."""
-        if self._qt_log_handler is not None:
-            self._qt_log_handler.log_record.emit(msg, level)
+    def log_to_gui(self, msg: str, level: str = "INFO", step: int = None):
+        """Forward a message straight to the GUI handler as a LogRecord,
+        tagged with the current batch (and step, if given) for filtering."""
+        if self._gui_log_handler is None:
+            return
+        from datetime import datetime
+        from utils.log_manager import LogRecord, LEVEL_PRIORITY
+        self._gui_log_handler.log_emitted.emit(
+            LogRecord(
+                timestamp=datetime.now(),
+                level=level,
+                level_no=LEVEL_PRIORITY.get(level, 20),
+                source="ham-step-widget",
+                message=msg,
+                batch_id=self.batch_id,
+                step=step,
+            )
+        )

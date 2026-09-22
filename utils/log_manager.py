@@ -2,14 +2,21 @@
 Centralized Logging Manager for HAM (HSTL Audio Metadata Framework).
 
 Ported from HPM's utils/log_manager.py
-(Photos/Version-2/Framework/utils/log_manager.py), adapted to HAM's existing
-logging pieces:
+(Photos/Version-2/Framework/utils/log_manager.py), including HPM's
+LogRecord/GUILogHandler pair (previously deferred — see CHANGELOG v0.2.8),
+adapted to HAM's specifics:
 
-- Reuses utils.qt_log_handler.QtLogHandler as the singleton GUI handler
-  (emits (message: str, level: str) — HAM's LogWidget.append() contract)
-  instead of porting HPM's richer LogRecord/GUILogHandler dataclass. That
-  richer, filterable record type belongs with a future LogViewerDialog port
-  (see docs/HSTL_Audio_Framework-Development_Plan.md).
+- LogRecord's level filter/dropdown includes HAM's custom SUCCESS level
+  (25, between INFO and WARNING) and CRITICAL, which HPM's own filter
+  dropdown omits.
+- ContextFilter (new, no HPM equivalent) — per-step-run loggers
+  (utils.logger.get_logger(), wired in gui/widgets/step_widget.py) aren't
+  children of the shared "ham" logger, and step implementations
+  (steps/*.py) log via plain self.logger.info(...) without `extra=`. This
+  filter, attached directly to each per-run logger, stamps batch_id/step
+  onto every record that reaches it, so LogViewerDialog's batch/step
+  filtering actually has something to filter on without editing every
+  step module.
 - Per-step execution keeps its own uniquely-named, per-run logger and log
   file (utils.logger.get_logger(), wired in gui/widgets/step_widget.py) —
   that mechanism is unchanged by this port and still gives one isolated
@@ -22,7 +29,8 @@ logging pieces:
 Provides:
 - Session-level logging (whole app run) to a rotating file
 - Per-batch logging to a rotating file
-- A singleton GUI handler for real-time display in the Logs tab
+- A singleton GUI handler emitting structured LogRecords, for real-time,
+  filterable display in the Logs tab and pop-out LogViewerDialog
 - Verbosity level control
 """
 
@@ -31,10 +39,12 @@ import threading
 from pathlib import Path
 from typing import Dict, Optional
 from datetime import datetime
+from dataclasses import dataclass
 from logging.handlers import RotatingFileHandler
 
+from PyQt6.QtCore import QObject, pyqtSignal
+
 from utils.logger import SUCCESS_LEVEL
-from utils.qt_log_handler import QtLogHandler
 
 # Verbosity level mappings (mirrors HPM's utils/log_manager.py)
 VERBOSITY_LEVELS = {
@@ -43,6 +53,116 @@ VERBOSITY_LEVELS = {
     "detailed": logging.DEBUG,    # All operations including debug
     "success": SUCCESS_LEVEL,     # Custom success level
 }
+
+# Level filter priority — used by LogRecord.matches_filter(). Includes
+# HAM's SUCCESS level and CRITICAL, both of which HPM's dropdown omits.
+LEVEL_PRIORITY = {
+    "DEBUG": 10,
+    "INFO": 20,
+    "SUCCESS": SUCCESS_LEVEL,
+    "WARNING": 30,
+    "ERROR": 40,
+    "CRITICAL": 50,
+}
+
+
+@dataclass
+class LogRecord:
+    """Enhanced log record with metadata for GUI filtering/display."""
+
+    timestamp: datetime
+    level: str
+    level_no: int
+    source: str
+    message: str
+    batch_id: Optional[str] = None
+    step: Optional[int] = None
+
+    def matches_filter(
+        self,
+        level_filter: str = "ALL",
+        batch_filter: Optional[str] = None,
+        step_filter: Optional[int] = None,
+        search_text: str = "",
+    ) -> bool:
+        """Check if this record matches the given filter settings."""
+        if level_filter != "ALL":
+            if LEVEL_PRIORITY.get(self.level, 0) < LEVEL_PRIORITY.get(level_filter, 0):
+                return False
+        if batch_filter and self.batch_id != batch_filter:
+            return False
+        if step_filter is not None and self.step != step_filter:
+            return False
+        if search_text and search_text.lower() not in self.message.lower():
+            return False
+        return True
+
+    def format_display(self) -> str:
+        """Format for display in the log viewer."""
+        ts = self.timestamp.strftime("%H:%M:%S")
+        parts = [f"[{ts}]", f"[{self.level}]"]
+        if self.batch_id:
+            parts.append(f"[{self.batch_id[:8]}]")
+        if self.step is not None:
+            parts.append(f"[Step {self.step}]")
+        parts.append(self.message)
+        return " ".join(parts)
+
+
+class GUILogHandler(logging.Handler, QObject):
+    """Thread-safe logging handler that emits a LogRecord via a Qt signal.
+
+    Qt auto-queues signal emissions from a worker thread onto the GUI
+    thread, so this is safe to attach to loggers used from StepRunner's
+    background thread (gui/workers.py).
+    """
+
+    log_emitted = pyqtSignal(object)  # Emits LogRecord
+
+    def __init__(self):
+        logging.Handler.__init__(self)
+        QObject.__init__(self)
+        self.setFormatter(logging.Formatter("%(message)s"))
+
+    def emit(self, record: logging.LogRecord):
+        try:
+            log_record = LogRecord(
+                timestamp=datetime.fromtimestamp(record.created),
+                level=record.levelname,
+                level_no=record.levelno,
+                source=record.name,
+                message=self.format(record),
+                batch_id=getattr(record, "batch_id", None),
+                step=getattr(record, "step", None),
+            )
+            self.log_emitted.emit(log_record)
+        except Exception:
+            self.handleError(record)
+
+
+class ContextFilter(logging.Filter):
+    """Stamps batch_id/step onto every record from a per-run step logger.
+
+    Step implementations (steps/*.py) log via plain self.logger.info(...)
+    without passing `extra=`, so without this filter their records would
+    reach LogViewerDialog with batch_id=step=None, making batch/step
+    filtering useless for the most common log source. No HPM equivalent
+    — HPM's step logic all runs through the single shared "hstl_framework"
+    logger LogManager itself tags via extra=, so this problem doesn't
+    arise there.
+    """
+
+    def __init__(self, batch_id: Optional[str], step: Optional[int]):
+        super().__init__()
+        self.batch_id = batch_id
+        self.step = step
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if getattr(record, "batch_id", None) is None:
+            record.batch_id = self.batch_id
+        if getattr(record, "step", None) is None:
+            record.step = self.step
+        return True
 
 
 class BatchFileHandler(RotatingFileHandler):
@@ -97,7 +217,7 @@ class LogManager:
     def __init__(self):
         self._logger = logging.getLogger("ham")
         self._batch_handlers: Dict[str, BatchFileHandler] = {}
-        self._gui_handler: Optional[QtLogHandler] = None
+        self._gui_handler: Optional[GUILogHandler] = None
         self._session_handler: Optional[RotatingFileHandler] = None
         self._verbosity = "normal"
         self._session_log_path: Optional[Path] = None
@@ -124,10 +244,10 @@ class LogManager:
 
         self.info(f"Session logging initialized: {self._session_log_path}")
 
-    def get_gui_handler(self) -> QtLogHandler:
+    def get_gui_handler(self) -> GUILogHandler:
         """Get or create the singleton GUI log handler."""
         if self._gui_handler is None:
-            self._gui_handler = QtLogHandler()
+            self._gui_handler = GUILogHandler()
             self._gui_handler.setLevel(VERBOSITY_LEVELS.get(self._verbosity, logging.INFO))
             self._logger.addHandler(self._gui_handler)
         return self._gui_handler

@@ -2,27 +2,22 @@
 Pop-out Log Viewer Dialog for HAM GUI.
 
 Ported from HPM's gui/dialogs/log_viewer_dialog.py
-(Photos/Version-2/Framework/gui/dialogs/log_viewer_dialog.py). HPM's
-version hosts an EnhancedLogWidget with level/batch/step filtering and
-text search, built on a structured LogRecord that HPM's GUI handler
-emits. HAM's LogManager/QtLogHandler (utils/log_manager.py,
-utils/qt_log_handler.py) still emit plain (message, level) strings —
-upgrading that to a filterable LogRecord is tracked as a follow-up in
-docs/HSTL_Audio_Framework-Development_Plan.md. This port ships the
-pop-out-window mechanic itself (useful on its own for keeping logs
-visible on a second monitor) plus a simple text export, reusing HAM's
-existing LogWidget rather than a filtering-capable one.
+(Photos/Version-2/Framework/gui/dialogs/log_viewer_dialog.py). Now that
+LogWidget itself carries the LogRecord/filtering upgrade (see
+utils/log_manager.py and gui/widgets/log_widget.py), this dialog is the
+thin wrapper HPM's version is too — level/batch/step filtering, search,
+and export all come from the shared LogWidget, used identically here and
+in the main Logs tab (mirroring how HPM reuses EnhancedLogWidget in both
+places).
 """
 
-from datetime import datetime
+from typing import List, Optional
 
-from PyQt6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QFileDialog, QMessageBox,
-)
+from PyQt6.QtWidgets import QDialog, QVBoxLayout
 from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QTextCursor
 
 from gui.widgets.log_widget import LogWidget
+from utils.log_manager import LogRecord
 
 
 class LogViewerDialog(QDialog):
@@ -30,35 +25,31 @@ class LogViewerDialog(QDialog):
 
     closed = pyqtSignal()
 
-    def __init__(self, parent=None, log_handler=None, initial_text: str = ""):
+    def __init__(
+        self,
+        parent=None,
+        log_handler=None,
+        initial_records: Optional[List[LogRecord]] = None,
+    ):
         super().__init__(parent)
         self._batch_name = None
         self._log_handler = log_handler
 
-        self._init_ui(initial_text)
+        self._init_ui(initial_records or [])
         self._setup_window()
 
         if self._log_handler is not None:
-            self._log_handler.log_record.connect(self.log_widget.append)
+            self._log_handler.log_emitted.connect(self.log_widget.append_log)
 
-    def _init_ui(self, initial_text: str):
+    def _init_ui(self, initial_records: List[LogRecord]):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(5, 5, 5, 5)
 
         self.log_widget = LogWidget()
         self.log_widget.set_popped_out(True)
-        if initial_text:
-            self.log_widget.text_area.setPlainText(initial_text)
-            self.log_widget.text_area.moveCursor(QTextCursor.MoveOperation.End)
+        for record in initial_records:
+            self.log_widget.append_log(record)
         layout.addWidget(self.log_widget)
-
-        export_layout = QHBoxLayout()
-        export_layout.addStretch()
-        export_btn = QPushButton("Export…")
-        export_btn.setToolTip("Export the visible log text to a file")
-        export_btn.clicked.connect(self._export_logs)
-        export_layout.addWidget(export_btn)
-        layout.addLayout(export_layout)
 
     def _setup_window(self):
         self.setWindowTitle("HAM Log Viewer")
@@ -70,7 +61,7 @@ class LogViewerDialog(QDialog):
             | Qt.WindowType.WindowCloseButtonHint
         )
 
-        self.resize(900, 550)
+        self.resize(1000, 600)
 
         # Position slightly offset from parent if available
         if self.parent():
@@ -85,27 +76,14 @@ class LogViewerDialog(QDialog):
         else:
             self.setWindowTitle("HAM Log Viewer")
 
-    def _export_logs(self):
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        default_name = f"ham_logs_{timestamp}.txt"
-
-        file_path, _ = QFileDialog.getSaveFileName(
-            self, "Export Logs", default_name, "Text Files (*.txt);;All Files (*)"
-        )
-        if not file_path:
-            return
-
-        try:
-            with open(file_path, "w", encoding="utf-8") as f:
-                f.write(self.log_widget.text_area.toPlainText())
-            QMessageBox.information(self, "Export Complete", f"Exported logs to:\n{file_path}")
-        except Exception as e:
-            QMessageBox.critical(self, "Export Failed", f"Could not export logs:\n{e}")
+    def add_batch_option(self, batch_id: str, batch_name: str):
+        """Add a batch to the filter dropdown."""
+        self.log_widget.add_batch_option(batch_id, batch_name)
 
     def closeEvent(self, event):
         if self._log_handler is not None:
             try:
-                self._log_handler.log_record.disconnect(self.log_widget.append)
+                self._log_handler.log_emitted.disconnect(self.log_widget.append_log)
             except TypeError:
                 pass  # already disconnected
         self.closed.emit()

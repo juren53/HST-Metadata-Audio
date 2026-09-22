@@ -136,9 +136,9 @@ class MainWindow(QMainWindow):
         saved_verbosity = self.settings.value("logging/verbosity", "normal")
         self.log_manager.set_verbosity(saved_verbosity)
 
-        self._qt_log_handler = self.log_manager.get_gui_handler()
-        self._qt_log_handler.log_record.connect(self.log_widget.append)
-        self.step_widget.set_log_handler(self._qt_log_handler)
+        self._gui_log_handler = self.log_manager.get_gui_handler()
+        self._gui_log_handler.log_emitted.connect(self.log_widget.append_log)
+        self.step_widget.set_log_handler(self._gui_log_handler)
 
     # ──────────────────────────────────────────────────────────────────────
     # Menu bar
@@ -295,7 +295,9 @@ class MainWindow(QMainWindow):
             self.log_manager.setup_batch_logging(batch_id, data_dir)
 
         self.log_manager.info(f"Selected batch: {batch_info['name']}", batch_id=batch_id)
+        self.log_widget.add_batch_option(batch_id, batch_info.get("name", ""))
         if self.log_viewer_dialog is not None:
+            self.log_viewer_dialog.add_batch_option(batch_id, batch_info.get("name", ""))
             self.log_viewer_dialog.set_batch_name(batch_info.get("name", ""))
         self.status_bar.showMessage(f"Current batch: {batch_info['name']}")
         self.tabs.setCurrentIndex(1)
@@ -423,11 +425,14 @@ class MainWindow(QMainWindow):
     def _pop_out_logs(self):
         """Open logs in a separate window."""
         if self.log_viewer_dialog is None:
-            initial_text = self.log_widget.text_area.toPlainText()
             self.log_viewer_dialog = LogViewerDialog(
-                self, log_handler=self._qt_log_handler, initial_text=initial_text
+                self,
+                log_handler=self._gui_log_handler,
+                initial_records=self.log_widget.get_records(),
             )
             self.log_viewer_dialog.closed.connect(self._on_log_viewer_closed)
+            for batch_id, batch_info in self.registry.get_active_batches().items():
+                self.log_viewer_dialog.add_batch_option(batch_id, batch_info.get("name", ""))
             if self.current_batch_id:
                 batch = self.registry.get_batch(self.current_batch_id)
                 if batch:

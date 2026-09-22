@@ -13,7 +13,7 @@ from PyQt6.QtCore import QThread, pyqtSignal
 class StepRunner(QThread):
     """Runs a single StepProcessor off the UI thread.
 
-    Log messages already reach the GUI via the logger's QtLogHandler —
+    Log messages already reach the GUI via the logger's GUILogHandler —
     Qt auto-queues signal emissions from a worker thread onto the GUI
     thread, so no separate progress signal is needed here. This thread
     only needs to report the terminal outcome.

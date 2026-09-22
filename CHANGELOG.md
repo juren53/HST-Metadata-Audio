@@ -11,6 +11,67 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## HAM [0.2.9] - 2026-09-21 2347 CDT
+
+### Added
+- **`utils/log_manager.py`**: `LogRecord` dataclass (timestamp, level,
+  level_no, source, message, batch_id, step) with `matches_filter()`
+  and `format_display()`, and `GUILogHandler` (replaces
+  `utils/qt_log_handler.QtLogHandler`, now removed) emitting structured
+  `LogRecord`s instead of plain `(message, level)` strings — ported
+  from HPM's `utils/log_manager.py`. `LEVEL_PRIORITY` adds HAM's
+  `SUCCESS` and `CRITICAL` levels, which HPM's own filter dropdown
+  omits.
+- **`utils/log_manager.ContextFilter`** (new, no HPM equivalent) —
+  attached to each per-run step logger in `step_widget.py`, stamps
+  `batch_id`/`step` onto every record that reaches it, even when step
+  code logs via plain `self.logger.info(...)` without `extra=`. HPM
+  doesn't need this: all of its step logic shares one logger that
+  `LogManager` itself tags; HAM creates a fresh logger per step
+  invocation, so without this filter, batch/step filtering on
+  step-internal log lines would be useless. Verified end-to-end with an
+  unmodified step class.
+- **`gui/widgets/log_widget.py`**: `LogWidget` absorbed HPM's
+  `EnhancedLogWidget`/`LogFilterBar`
+  (`Photos/Version-2/Framework/gui/widgets/enhanced_log_widget.py`) —
+  level/batch/step filtering, text search, auto-scroll, a status count,
+  export (now on the widget itself, available in both the main Logs
+  tab and the pop-out), and a bounded record buffer (`max_records`,
+  default 2000, evicts oldest on overflow). Deliberately **not**
+  ported: HPM's forced dark background and per-level text color — HAM's
+  log pane follows the app's current theme instead of overriding it.
+
+### Changed
+- **`gui/widgets/step_widget.py`**: `log_to_gui()` now builds a
+  `LogRecord` (tagged with the current batch and, where known, step)
+  and emits it via the shared `GUILogHandler.log_emitted` signal
+  instead of the retired `QtLogHandler.log_record` string signal; the
+  "Step N: OK" completion message now logs at `SUCCESS` level instead
+  of `INFO`, matching HPM's `step_complete()` convention now that
+  `SUCCESS` is a real filterable level.
+- **`gui/main_window.py`**: wires `GUILogHandler.log_emitted` to
+  `LogWidget.append_log()` (was `QtLogHandler.log_record` →
+  `LogWidget.append()`); `_pop_out_logs()` seeds the dialog with the
+  main tab's existing `LogRecord`s (`get_records()`) instead of raw
+  text, so the pop-out's filters have real history to work with from
+  the moment it opens; batch selection now also calls
+  `log_widget.add_batch_option()` / `log_viewer_dialog.add_batch_option()`
+  to populate the Batch filter dropdown.
+- **`gui/dialogs/log_viewer_dialog.py`**: now a thin pop-out wrapper
+  around the upgraded `LogWidget` (matching HPM's own
+  `LogViewerDialog`, which is similarly thin around
+  `EnhancedLogWidget`) — the dialog's own Export button was removed
+  since `LogWidget` now has one.
+
+### Removed
+- **`utils/qt_log_handler.py`** — superseded by
+  `utils/log_manager.GUILogHandler`; no remaining references.
+  - **Files Modified**: `docs/HSTL_Audio_Framework-Development_Plan.md`
+    (marked the `LogRecord`/`GUILogHandler` upgrade complete — this was
+    the last tracked HPM-parity gap in the logging pipeline)
+
+---
+
 ## HAM [0.2.8] - 2026-09-21 2338 CDT
 
 ### Added
