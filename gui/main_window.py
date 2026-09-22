@@ -32,6 +32,7 @@ from gui.widgets.batch_info_panel import BatchInfoPanel
 from gui.widgets.config_widget import ConfigWidget
 from gui.widgets.log_widget import LogWidget
 from gui.dialogs.new_batch_dialog import NewBatchDialog
+from gui.dialogs.log_viewer_dialog import LogViewerDialog
 from utils.log_manager import LogManager
 from gui.theme import DEFAULT_THEME, get_theme_registry, get_fusion_palette, is_dark_theme
 from gui.zoom_manager import ZoomManager
@@ -122,6 +123,8 @@ class MainWindow(QMainWindow):
 
     def _create_logs_tab(self):
         self.log_widget = LogWidget()
+        self.log_widget.pop_out_requested.connect(self._pop_out_logs)
+        self.log_viewer_dialog = None
         self.tabs.addTab(self.log_widget, "Logs")
 
     def _wire_log_handler(self):
@@ -182,6 +185,13 @@ class MainWindow(QMainWindow):
         zoom_reset_action.setStatusTip("Reset zoom to 100%")
         zoom_reset_action.triggered.connect(self._reset_zoom)
         view_menu.addAction(zoom_reset_action)
+
+        view_menu.addSeparator()
+        pop_out_logs_action = QAction("Pop Out &Logs", self)
+        pop_out_logs_action.setShortcut("Ctrl+L")
+        pop_out_logs_action.setStatusTip("Open logs in a separate window")
+        pop_out_logs_action.triggered.connect(self._pop_out_logs)
+        view_menu.addAction(pop_out_logs_action)
 
         # Batch
         batch_menu = mb.addMenu("&Batch")
@@ -285,6 +295,8 @@ class MainWindow(QMainWindow):
             self.log_manager.setup_batch_logging(batch_id, data_dir)
 
         self.log_manager.info(f"Selected batch: {batch_info['name']}", batch_id=batch_id)
+        if self.log_viewer_dialog is not None:
+            self.log_viewer_dialog.set_batch_name(batch_info.get("name", ""))
         self.status_bar.showMessage(f"Current batch: {batch_info['name']}")
         self.tabs.setCurrentIndex(1)
 
@@ -404,6 +416,29 @@ class MainWindow(QMainWindow):
     def _on_zoom_changed(self, factor: float):
         self.status_bar.showMessage(f"Zoom: {self.zoom_manager.get_zoom_percentage()}%", 2000)
 
+    # ──────────────────────────────────────────────────────────────────────
+    # Log viewer pop-out
+    # ──────────────────────────────────────────────────────────────────────
+
+    def _pop_out_logs(self):
+        """Open logs in a separate window."""
+        if self.log_viewer_dialog is None:
+            initial_text = self.log_widget.text_area.toPlainText()
+            self.log_viewer_dialog = LogViewerDialog(
+                self, log_handler=self._qt_log_handler, initial_text=initial_text
+            )
+            self.log_viewer_dialog.closed.connect(self._on_log_viewer_closed)
+            if self.current_batch_id:
+                batch = self.registry.get_batch(self.current_batch_id)
+                if batch:
+                    self.log_viewer_dialog.set_batch_name(batch.get("name", ""))
+
+        self.log_viewer_dialog.show_and_raise()
+        self.status_bar.showMessage("Log viewer opened in separate window", 2000)
+
+    def _on_log_viewer_closed(self):
+        self.log_viewer_dialog = None
+
     def wheelEvent(self, event):
         if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
             app = QApplication.instance()
@@ -503,4 +538,6 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event):
         self._save_window_state()
         self.zoom_manager.save_zoom_preference()
+        if self.log_viewer_dialog is not None:
+            self.log_viewer_dialog.close()
         event.accept()

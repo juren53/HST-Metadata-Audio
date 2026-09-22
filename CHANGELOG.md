@@ -11,6 +11,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## HAM [0.2.8] - 2026-09-21 2338 CDT
+
+### Added
+- **`gui/dialogs/log_viewer_dialog.py`** (new) — `LogViewerDialog`,
+  ported from HPM's `gui/dialogs/log_viewer_dialog.py`
+  (`Photos/Version-2/Framework/gui/dialogs/log_viewer_dialog.py`),
+  trimmed to what HAM's logging pipeline currently supports:
+  - Opens logs in a standalone, independently-positioned window (useful
+    for a second monitor), offset from the main window like HPM's
+  - Carries over the main Logs tab's existing text when first opened,
+    then stays live via the shared `LogManager` GUI handler — the main
+    tab and the pop-out update simultaneously
+  - Plain-text export to a file, and the window title tracks the
+    current batch name
+  - **Not ported**: HPM's `EnhancedLogWidget`/`LogFilterBar`
+    (level/batch/step filtering, text search) — those need HPM's
+    structured `LogRecord` object, which HAM's `QtLogHandler` doesn't
+    emit (it emits plain `(message, level)` strings). Upgrading that
+    pipeline is tracked as a follow-up (Phase 2 item 7 in the dev plan)
+    that would also unlock `SettingsDialog`'s remaining controls.
+- **`gui/widgets/log_widget.py`**: `LogWidget` gained a `pop_out_requested`
+  signal and a "Pop Out" button (mirroring HPM's `EnhancedLogWidget`),
+  plus `set_popped_out()` to hide that button on the pop-out's own
+  internal `LogWidget` instance.
+
+### Changed
+- **`gui/main_window.py`**: `_create_logs_tab()` wires
+  `log_widget.pop_out_requested` to a new `_pop_out_logs()` handler
+  (also reachable via View → Pop Out Logs, Ctrl+L, mirroring HPM); the
+  dialog is created once per open and cleared via `_on_log_viewer_closed()`
+  when closed, matching HPM's lifecycle. Batch selection updates the
+  pop-out's title if it's open, and `closeEvent()` closes it on app exit.
+  - **Files Modified**: `docs/HSTL_Audio_Framework-Development_Plan.md`
+    (marked LogViewerDialog item complete — all five headline HPM
+    GUI/infrastructure ports from this plan are now done; remaining
+    work is the `LogRecord` upgrade, per-step dialogs, and testing)
+
+---
+
 ## HAM [0.2.7] - 2026-09-21 2333 CDT
 
 ### Added
