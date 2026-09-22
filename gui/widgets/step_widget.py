@@ -7,11 +7,15 @@ lets the user run individual steps.
 Step execution runs on a background QThread (gui.workers.StepRunner) so
 the UI stays responsive during long steps, ported from HPM's per-step
 QThread worker pattern (Photos/Version-2/Framework/gui/dialogs/step5_dialog.py).
+
+Step 1 opens gui.dialogs.step1_dialog.Step1Dialog first (mirroring HPM's
+_run_step_1() special-casing in gui/main_window.py) to import the CSV
+and MP3 files before running Step 1's actual validation/matching.
 """
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-    QPushButton, QGroupBox, QProgressBar, QFrame, QSizePolicy,
+    QPushButton, QGroupBox, QProgressBar, QFrame, QSizePolicy, QDialog,
 )
 from PyQt6.QtCore import pyqtSignal, Qt
 
@@ -128,8 +132,26 @@ class StepWidget(QWidget):
     # ──────────────────────────────────────────────────────────────────────
 
     def _run_step(self, step_num: int):
+        """Entry point for running a step. Step 1 opens Step1Dialog first
+        to import the CSV/MP3 files; other steps dispatch directly."""
         if self.config is None or step_num in self._active_runners:
             return
+
+        if step_num == 1:
+            from pathlib import Path
+            from utils.path_manager import PathManager
+            from gui.dialogs.step1_dialog import Step1Dialog
+
+            data_dir = Path(self.config.get("project.data_directory"))
+            paths = PathManager(data_dir)
+            dialog = Step1Dialog(paths, parent=self, batch_id=self.batch_id)
+            if dialog.exec() != QDialog.DialogCode.Accepted:
+                self._run_all_active = False  # don't leave "Run All" stuck
+                return
+
+        self._dispatch_step_run(step_num)
+
+    def _dispatch_step_run(self, step_num: int):
         import time
         from pathlib import Path
         from utils.path_manager import PathManager

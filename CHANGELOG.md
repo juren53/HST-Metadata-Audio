@@ -11,6 +11,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## HAM [0.3.0] - 2026-09-21 2359 CDT
+
+### Added
+- **`gui/dialogs/step1_dialog.py`** (new) — `Step1Dialog`, ported from
+  HPM's `gui/dialogs/step1_dialog.py`
+  (`Photos/Version-2/Framework/gui/dialogs/step1_dialog.py`), adapted:
+  HAM's Step 1 needs both a CSV file and a folder of MP3s, not a single
+  Excel file. Closes a real gap — there was previously no GUI way to
+  get a CSV or MP3 files into a batch's `input/` directories at all;
+  users had to place them there via File Explorer before clicking Run
+  Step 1.
+  - **Browse CSV…**: quick required-column check (`REQUIRED_CSV_COLUMNS`),
+    then replaces any existing CSV in `input/csv/` so
+    `PathManager.find_csv_file()` stays unambiguous
+  - **Import MP3 Folder…**: copies every `.mp3` from a selected folder
+    into `input/mp3/` on a background `QThread`
+    (`Step1ImportThread`, no HPM equivalent — HPM's single-file case
+    never needed one; HAM batches can run to thousands of files).
+    Additive: files already present by name are skipped, so importing
+    from more than one source folder just adds to what's there
+  - "Continue" only enables once a CSV and at least one MP3 are staged
+- **`gui/widgets/step_widget.py`**: `_run_step(1)` now opens
+  `Step1Dialog` first; Continue proceeds into the existing `StepRunner`
+  execution (unchanged since v0.2.4), Cancel runs nothing. The former
+  `_run_step()` body is now `_dispatch_step_run()`, called directly for
+  Steps 2-5 and after a Step 1 dialog accept.
+
+### Evaluated, not ported
+- Per-step dialogs for Steps 2, 3, 5 — parameterless, already
+  adequately served by the current Run button; a dialog would mostly
+  duplicate what's there.
+- A Step 4 dialog — found blocked on a separate, pre-existing gap:
+  `steps/step4_thumbnail_embed.py`'s font size/color/box are hardcoded
+  module constants, never actually read from `step_configurations.step4`
+  despite `DEFAULT_SETTINGS` defining them and the CLI reference
+  documenting `config --step 4 --set thumbnail_font_size 32` as if it
+  works. A dialog would be editing values nothing consults — tracked as
+  a separate follow-up (wire the step to `get_step_config()` first).
+  - **Files Modified**: `docs/HSTL_Audio_Framework-Development_Plan.md`
+    (marked per-step dialogs evaluated/done — this completes every item
+    identified in the original HPM component-mapping table; added Step
+    4 config-wiring as a new tracked item)
+
+---
+
 ## HAM [0.2.9] - 2026-09-21 2347 CDT
 
 ### Added
