@@ -29,6 +29,7 @@ from utils.logger import get_logger
 from gui.widgets.batch_list_widget import BatchListWidget
 from gui.widgets.step_widget import StepWidget
 from gui.widgets.batch_info_panel import BatchInfoPanel
+from gui.widgets.config_widget import ConfigWidget
 from gui.widgets.log_widget import LogWidget
 from gui.dialogs.new_batch_dialog import NewBatchDialog
 from utils.log_manager import LogManager
@@ -113,10 +114,11 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self.batch_splitter, "Current Batch")
 
     def _create_config_tab(self):
-        # TODO: implement ConfigWidget (stub placeholder)
-        placeholder = QLabel("Configuration editor — coming soon")
-        placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.tabs.addTab(placeholder, "Configuration")
+        self.config_widget = ConfigWidget()
+        config_scroll = QScrollArea()
+        config_scroll.setWidget(self.config_widget)
+        config_scroll.setWidgetResizable(True)
+        self.tabs.addTab(config_scroll, "Configuration")
 
     def _create_logs_tab(self):
         self.log_widget = LogWidget()
@@ -274,6 +276,7 @@ class MainWindow(QMainWindow):
         self.registry.update_last_accessed(batch_id)
         self.step_widget.set_batch(self.current_config, batch_id, batch_info)
         self.batch_info_panel.set_batch(self.current_config, batch_id, batch_info)
+        self.config_widget.set_config(self.current_config)
 
         data_dir = Path(batch_info.get("data_directory", ""))
         if data_dir.exists():

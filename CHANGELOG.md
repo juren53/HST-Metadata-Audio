@@ -11,6 +11,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## HAM [0.2.6] - 2026-09-21 2330 CDT
+
+### Added
+- **`gui/widgets/config_widget.py`** (new) — `ConfigWidget`, ported from
+  HPM's `gui/widgets/config_widget.py`
+  (`Photos/Version-2/Framework/gui/widgets/config_widget.py`): a
+  read-only `QTreeWidget` view of the current batch's
+  `project_config.yaml`, with a Refresh button. HPM's `config_changed`
+  signal was declared but never emitted anywhere in HPM itself, so it
+  was not ported.
+
+### Changed
+- **`gui/main_window.py`**: `_create_config_tab()` now builds a real
+  `ConfigWidget` (wrapped in a `QScrollArea`, same as the other tabs)
+  instead of the `"Configuration editor — coming soon"` placeholder
+  label; `_on_batch_selected()` now calls `config_widget.set_config()`
+  alongside the existing `step_widget`/`batch_info_panel` updates
+  - **Files Modified**: `docs/HSTL_Audio_Framework-Development_Plan.md`
+    (marked ConfigWidget item complete in the HPM component-mapping
+    table and Next Steps)
+
+---
+
 ## HAM [0.2.5] - 2026-09-21 1454 CDT
 
 ### Added
