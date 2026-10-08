@@ -6,6 +6,12 @@ post-processed/
 # Timestamped analysis outputs (keep script and PROCESS_NOTES, not output runs)
 analysis/HST_Audio_Analysis_*.xlsx
 
+# Python bytecode and virtual environments
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
 # PyInstaller build artifacts
 build/
 dist/
