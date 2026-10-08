@@ -46,7 +46,15 @@ if (-not (Test-Path $Marker)) {
 if ($installDeps) {
     Write-Host "Installing dependencies..."
     pip install --upgrade pip -q
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "Error: Failed to upgrade pip."
+        exit 1
+    }
     pip install -r $Requirements -q
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "Error: Failed to install dependencies from $Requirements."
+        exit 1
+    }
     New-Item -ItemType File -Path $Marker -Force | Out-Null
 }
 
