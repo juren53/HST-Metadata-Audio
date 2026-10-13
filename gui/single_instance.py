@@ -1,11 +1,11 @@
-"""
-Single-instance guard for HAM.
+"""Single-instance guard for HAM.
 
+Copied from https://github.com/juren53/single-instance-guard (v1.0.0).
 Uses QLocalServer / QLocalSocket so a second launch silently raises
 the already-running window rather than showing an error dialog.
 
 Usage in launcher:
-    guard = SingleInstanceGuard()
+    guard = SingleInstanceGuard("HSTL-HAM-SingleInstance")
     if not guard.try_acquire():
         sys.exit(0)           # existing instance raised; we exit cleanly
     window = MainWindow()
@@ -13,19 +13,22 @@ Usage in launcher:
     app.aboutToQuit.connect(guard.release)
 """
 
-from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtCore import Qt
 from PyQt6.QtNetwork import QLocalServer, QLocalSocket
 
 
-_SOCKET_NAME = "HSTL-HAM-SingleInstance"
-_CONNECT_TIMEOUT_MS = 500
-_WRITE_TIMEOUT_MS = 1000
-
-
 class SingleInstanceGuard:
-    """Allows only one HAM process at a time; secondary launches raise the primary."""
+    """Allows only one process at a time; secondary launches raise the primary."""
 
-    def __init__(self):
+    def __init__(
+        self,
+        app_id: str,
+        connect_timeout_ms: int = 500,
+        write_timeout_ms: int = 1000,
+    ):
+        self._socket_name = app_id
+        self._connect_timeout_ms = connect_timeout_ms
+        self._write_timeout_ms = write_timeout_ms
         self._server: QLocalServer | None = None
 
     def try_acquire(self) -> bool:
@@ -35,17 +38,17 @@ class SingleInstanceGuard:
         (caller should exit immediately).
         """
         probe = QLocalSocket()
-        probe.connectToServer(_SOCKET_NAME)
-        if probe.waitForConnected(_CONNECT_TIMEOUT_MS):
+        probe.connectToServer(self._socket_name)
+        if probe.waitForConnected(self._connect_timeout_ms):
             probe.write(b"raise")
-            probe.waitForBytesWritten(_WRITE_TIMEOUT_MS)
+            probe.waitForBytesWritten(self._write_timeout_ms)
             probe.disconnectFromServer()
             return False
 
         # Become the primary — remove any stale socket from a previous crash
-        QLocalServer.removeServer(_SOCKET_NAME)
+        QLocalServer.removeServer(self._socket_name)
         self._server = QLocalServer()
-        self._server.listen(_SOCKET_NAME)
+        self._server.listen(self._socket_name)
         return True
 
     def connect_window(self, window) -> None:
@@ -76,5 +79,5 @@ class SingleInstanceGuard:
     def release(self) -> None:
         if self._server:
             self._server.close()
-            QLocalServer.removeServer(_SOCKET_NAME)
+            QLocalServer.removeServer(self._socket_name)
             self._server = None

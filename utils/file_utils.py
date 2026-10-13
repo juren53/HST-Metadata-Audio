@@ -4,7 +4,7 @@ File operation utilities for HAM.
 
 import shutil
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 
 def safe_copy(src: Path, dst: Path, overwrite: bool = True) -> bool:
@@ -18,6 +18,23 @@ def safe_copy(src: Path, dst: Path, overwrite: bool = True) -> bool:
     except OSError as e:
         print(f"[file_utils] copy failed {src} -> {dst}: {e}")
         return False
+
+
+def read_csv_text(path: Path) -> Tuple[str, str]:
+    """Read a CSV's text, tolerating non-UTF-8 exports.
+
+    Tries UTF-8 (with or without BOM) first, then Windows-1252 — what Excel
+    and most Windows database exports write (e.g. byte 0xA0 is a
+    non-breaking space there, but an invalid start byte in UTF-8). Latin-1
+    is the last resort since it decodes any byte. Returns (text, encoding).
+    """
+    data = Path(path).read_bytes()
+    for enc in ("utf-8-sig", "cp1252", "latin-1"):
+        try:
+            return data.decode(enc), enc
+        except UnicodeDecodeError:
+            continue
+    raise AssertionError("unreachable: latin-1 decodes every byte")
 
 
 def count_mp3s(directory: Path) -> int:

@@ -9,12 +9,14 @@ Extracted from audio-tags-12d.py (v0.12d).
 
 import csv
 import datetime
+import io
 from pathlib import Path
 from typing import List, Dict, Optional
 
 from steps.base_step import StepProcessor, ProcessingContext, StepResult
 from utils.validator import ValidationResult
 from config.settings import REQUIRED_CSV_COLUMNS
+from utils.file_utils import read_csv_text
 
 
 _MONTH_MAP = {
@@ -72,7 +74,8 @@ class Step2_CSVValidation(StepProcessor):
         warnings: List[str] = []
 
         try:
-            with open(csv_file, "r", encoding="utf-8-sig") as f:
+            text, _ = read_csv_text(csv_file)
+            with io.StringIO(text, newline="") as f:
                 reader = csv.DictReader(f)
 
                 # Check required columns

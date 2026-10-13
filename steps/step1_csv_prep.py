@@ -20,11 +20,13 @@ Populates context.shared_data:
 """
 
 import csv
+import io
 from pathlib import Path
 
 from steps.base_step import StepProcessor, ProcessingContext, StepResult
 from utils.validator import ValidationResult
 from config.settings import REQUIRED_CSV_COLUMNS
+from utils.file_utils import read_csv_text
 
 
 def _basename(value: str) -> str:
@@ -60,10 +62,10 @@ class Step1_CSVPrep(StepProcessor):
 
         # 2. Read CSV and validate columns
         try:
-            with open(csv_path, newline="", encoding="utf-8-sig") as fh:
-                reader = csv.DictReader(fh)
-                headers = reader.fieldnames or []
-                rows = list(reader)
+            text, _ = read_csv_text(csv_path)
+            reader = csv.DictReader(io.StringIO(text, newline=""))
+            headers = reader.fieldnames or []
+            rows = list(reader)
         except Exception as e:
             return StepResult(False, f"Cannot read CSV: {e}")
 

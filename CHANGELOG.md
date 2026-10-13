@@ -11,6 +11,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## HAM [0.3.1] - 2026-10-13 0934 CDT
+
+### Fixed
+- **Non-UTF-8 CSVs no longer fail to load** — a CSV saved from LibreOffice
+  with default settings (Windows-1252) was rejected by Step 1's Browse
+  CSV… with `'utf-8' codec can't decode byte 0xa0` (a non-breaking space
+  in cp1252). New `utils/file_utils.read_csv_text()` tries UTF-8 (with or
+  without BOM), then Windows-1252, then Latin-1, and returns the text plus
+  the encoding used. Used by `Step1Dialog`, `steps/step1_csv_prep.py` and
+  `steps/step2_csv_validation.py`.
+- `Step1Dialog` now writes the batch's copy of the CSV as UTF-8, so later
+  steps never see the source encoding; the output pane notes any
+  conversion (e.g. "converted from cp1252 to UTF-8"). Verified with
+  `Testing/LIST_HAM-30.csv` (cp1252, 30 rows).
+
+### Changed
+- **`gui/single_instance.py`** — synced to the shared
+  `juren53/single-instance-guard` v1.0.0: `SingleInstanceGuard` now takes
+  the socket name (`app_id`) and optional timeouts as constructor
+  arguments instead of module constants; `ham_gui.py` passes
+  `"HSTL-HAM-SingleInstance"`, so behavior is unchanged.
+
 ## HAM [0.3.0] - 2026-09-21 2359 CDT
 
 ### Added

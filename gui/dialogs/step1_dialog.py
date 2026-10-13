@@ -19,6 +19,7 @@ small file, so it runs synchronously on the button click.
 """
 
 import csv
+import io
 from pathlib import Path
 
 from PyQt6.QtWidgets import (
@@ -28,7 +29,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import QThread, pyqtSignal
 
 from config.settings import REQUIRED_CSV_COLUMNS
-from utils.file_utils import safe_copy, find_csv, count_mp3s
+from utils.file_utils import safe_copy, find_csv, count_mp3s, read_csv_text
 
 
 class Step1ImportThread(QThread):
@@ -182,8 +183,8 @@ class Step1Dialog(QDialog):
         src = Path(file_path)
 
         try:
-            with open(src, newline="", encoding="utf-8-sig") as fh:
-                headers = csv.DictReader(fh).fieldnames or []
+            text, encoding = read_csv_text(src)
+            headers = csv.DictReader(io.StringIO(text, newline="")).fieldnames or []
         except Exception as e:
             QMessageBox.critical(self, "Cannot Read CSV", f"Could not read the selected file:\n{e}")
             return
@@ -207,10 +208,13 @@ class Step1Dialog(QDialog):
             except OSError:
                 pass
 
+        # Write the batch copy as UTF-8 so later steps never see the source encoding
         dst = self.paths.input_csv_dir / src.name
-        if safe_copy(src, dst):
-            self.output_text.append(f"✓ Copied CSV: {src.name}")
-        else:
+        try:
+            dst.write_text(text, encoding="utf-8", newline="")
+            note = "" if encoding == "utf-8-sig" else f" (converted from {encoding} to UTF-8)"
+            self.output_text.append(f"✓ Copied CSV: {src.name}{note}")
+        except OSError:
             QMessageBox.critical(self, "Copy Failed", f"Could not copy {src.name} into the batch.")
         self._refresh_status()
 

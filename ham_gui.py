@@ -45,7 +45,7 @@ def main():
 
     # Single-instance guard — raise existing window and exit if already running
     from gui.single_instance import SingleInstanceGuard
-    guard = SingleInstanceGuard()
+    guard = SingleInstanceGuard("HSTL-HAM-SingleInstance")
     if not guard.try_acquire():
         sys.exit(0)
 
