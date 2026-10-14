@@ -20,6 +20,7 @@ Populates context.shared_data:
 
 import csv
 import io
+from datetime import datetime
 from pathlib import Path
 
 from steps.base_step import StepProcessor, ProcessingContext, StepResult
@@ -125,6 +126,7 @@ class Step1_CSVPrep(StepProcessor):
             "csv_total":  len(csv_filenames),
             "mp3_total":  len(mp3_names),
             "summary":    msg,
+            "run_at":     datetime.now().isoformat(timespec="seconds"),
         })
         return StepResult(True, msg, files_processed=len(matched_mp3s))
 

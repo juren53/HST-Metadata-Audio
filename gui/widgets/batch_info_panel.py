@@ -5,11 +5,12 @@ Shows batch registry metadata, per-step completion status, and a live
 scan of input/csv/ and input/mp3/ whenever a batch is loaded.
 """
 
+from datetime import datetime
 from pathlib import Path
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QFormLayout, QLabel,
-    QPushButton, QGroupBox, QSizePolicy,
+    QPushButton, QGroupBox, QSizePolicy, QFrame,
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QDesktopServices
@@ -81,27 +82,46 @@ class BatchInfoPanel(QWidget):
 
     def _build_files_group(self) -> QGroupBox:
         group = QGroupBox("Input Files")
-        form = QFormLayout(group)
+        vbox = QVBoxLayout(group)
+
+        # One form for both blocks so their value columns line up
+        form = QFormLayout()
         form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
         form.setHorizontalSpacing(12)
 
-        self._csv_name_val = QLabel("—")
-        self._csv_name_val.setWordWrap(True)
-        self._csv_size_val = QLabel("—")
+        # Files on disk (live scan)
+
+        self._csv_val = QLabel("—")
+        self._csv_val.setWordWrap(True)
         self._mp3_count_val = QLabel("—")
-        self._step1_match_val = QLabel("Step 1 not run yet")
-        self._step1_match_val.setWordWrap(True)
+
+        form.addRow("CSV:", self._csv_val)
+        form.addRow("MP3s:", self._mp3_count_val)
+
+        line = QFrame()
+        line.setFrameShape(QFrame.Shape.HLine)
+        line.setFrameShadow(QFrame.Shadow.Sunken)
+        form.addRow(line)
+
+        # Last Step 1 match result (saved in the batch config by Step 1)
+        self._match_header = QLabel("Step 1 Match")
+        self._match_header.setStyleSheet("font-weight: bold;")
+        form.addRow(self._match_header)
+
+        self._matched_val = QLabel("—")
+        self._no_mp3_val = QLabel("—")
+        self._no_csv_val = QLabel("—")
+
+        form.addRow("Matched:", self._matched_val)
+        form.addRow("No MP3:", self._no_mp3_val)
+        form.addRow("No CSV row:", self._no_csv_val)
+        vbox.addLayout(form)
 
         refresh_btn = QPushButton("Refresh")
         refresh_btn.setFixedWidth(80)
         refresh_btn.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         refresh_btn.clicked.connect(self._refresh_file_counts)
-
-        form.addRow("CSV File:", self._csv_name_val)
-        form.addRow("CSV Size:", self._csv_size_val)
-        form.addRow("MP3 Files:", self._mp3_count_val)
-        form.addRow("", refresh_btn)
-        form.addRow("Step 1 Match:", self._step1_match_val)
+        vbox.addWidget(refresh_btn, alignment=Qt.AlignmentFlag.AlignRight)
         return group
 
     def _build_dir_group(self) -> QGroupBox:
@@ -144,9 +164,8 @@ class BatchInfoPanel(QWidget):
         )
         self._progress_summary.setText(f"{done_count} of 5 steps complete")
 
-        # Last Step 1 match result, saved in the batch config by Step 1
-        summary = config.get("step_results.step1.summary") if config else None
-        self._step1_match_val.setText(summary or "Step 1 not run yet")
+        # Last Step 1 match result
+        self._show_step1_match(config.get("step_results.step1") if config else None)
 
         # File counts
         self._refresh_file_counts()
@@ -155,10 +174,10 @@ class BatchInfoPanel(QWidget):
         """Reset to no-batch-selected state."""
         for lbl in (self._name_val, self._id_val, self._status_val,
                     self._created_val, self._accessed_val, self._dir_val,
-                    self._csv_name_val, self._csv_size_val, self._mp3_count_val):
+                    self._csv_val, self._mp3_count_val):
             lbl.setText("—")
+        self._show_step1_match(None)
         self._progress_summary.setText("No batch selected")
-        self._step1_match_val.setText("—")
         self._open_btn.setEnabled(False)
         self._data_dir = None
 
@@ -176,15 +195,49 @@ class BatchInfoPanel(QWidget):
                 size_str = f"{size_bytes / 1_048_576:.1f} MB"
             else:
                 size_str = f"{size_bytes / 1024:.1f} KB"
-            self._csv_name_val.setText(csv_path.name)
-            self._csv_size_val.setText(size_str)
+            self._csv_val.setText(f"{csv_path.name}  ({size_str})")
         else:
-            self._csv_name_val.setText("None found in input/csv/")
-            self._csv_size_val.setText("—")
+            self._csv_val.setText("None found in input/csv/")
 
         mp3s = paths.get_mp3_files()
         self._mp3_count_val.setText(f"{len(mp3s)} file{'s' if len(mp3s) != 1 else ''}"
                                     if mp3s else "None found in input/mp3/")
+
+    def _show_step1_match(self, result: dict | None):
+        """Fill the Step 1 Match block from the saved step_results.step1."""
+        if not result or "matched" not in result:
+            self._match_header.setText("Step 1 Match")
+            self._matched_val.setText("Step 1 not run yet")
+            self._matched_val.setStyleSheet("")
+            self._no_mp3_val.setText("—")
+            self._no_csv_val.setText("—")
+            return
+
+        header = "Step 1 Match"
+        try:
+            run_at = datetime.fromisoformat(result["run_at"])
+            header += f"  ({run_at:%b %d, %H:%M})"
+        except (KeyError, TypeError, ValueError):
+            pass  # results saved before run_at was recorded
+        self._match_header.setText(header)
+
+        matched = result["matched"]
+        csv_total = result.get("csv_total", 0)
+        mp3_total = result.get("mp3_total", 0)
+        # matched is the overlap of the two sets, so these are exact
+        no_mp3 = csv_total - matched
+        no_csv = mp3_total - matched
+
+        if matched == 0:
+            color = "#f44336"   # red: nothing matched
+        elif no_mp3 == 0 and no_csv == 0:
+            color = "#4caf50"   # green: everything matched
+        else:
+            color = "#ff9800"   # amber: partial match
+        self._matched_val.setText(f"{matched} of {csv_total}")
+        self._matched_val.setStyleSheet(f"color: {color}; font-weight: bold;")
+        self._no_mp3_val.setText(f"{no_mp3} CSV row{'s' if no_mp3 != 1 else ''}")
+        self._no_csv_val.setText(f"{no_csv} MP3{'s' if no_csv != 1 else ''}")
 
     def _open_data_dir(self):
         if self._data_dir and self._data_dir.exists():

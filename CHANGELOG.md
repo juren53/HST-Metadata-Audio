@@ -11,6 +11,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## HAM [0.3.3] - 2026-10-14 1405 CDT
+
+### Changed
+- **Input Files section of the Current Batch panel reorganized** into two
+  blocks with one aligned label column:
+  - *Files on disk* — `CSV:` shows name and size on one row (was two
+    rows), then `MP3s:`.
+  - *Step 1 Match* — header shows when Step 1 last ran, e.g.
+    "Step 1 Match (Oct 14, 13:36)", followed by `Matched:` (e.g.
+    "1 of 30", colored red for none, amber for partial, green when
+    everything matched), `No MP3:` (CSV rows without an MP3) and
+    `No CSV row:` (MP3s without a CSV row).
+  - The Refresh button moved to the bottom-right of the section.
+- Step 1 now also saves `run_at` in `step_results.step1`. Results saved by
+  0.3.2 still display, without the run time.
+
 ## HAM [0.3.2] - 2026-10-14 1348 CDT
 
 ### Added
