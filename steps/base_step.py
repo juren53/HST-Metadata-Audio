@@ -105,6 +105,12 @@ class StepProcessor(ABC):
                 self.logger.warning(f"Output warning: {w}")
 
             context.config.update_step_status(self.step_number, True)
+            # Persist the status so it survives reloading the batch
+            if context.config.config_path:
+                if not context.config.save_config(context.config.config_data,
+                                                  context.config.config_path):
+                    self.logger.warning(
+                        f"Could not save step status to {context.config.config_path}")
             self.logger.info(f"Step {self.step_number} completed successfully")
             return result
 

@@ -11,6 +11,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## HAM [0.4.0] - 2026-10-14 1348 CDT
+
+### Added
+- **Step 1 match result in the Current Batch panel** — the Input Files
+  section of the right-hand panel has a new *Step 1 Match:* row showing the
+  last Step 1 result, e.g. "Matched 1 of 30 CSV Accession Numbers (291 MP3s
+  in input/mp3/)". Step 1 saves the counts under `step_results.step1` in
+  the batch's `project_config.yaml`, so the line survives reloading the
+  batch. The panel now refreshes after every step run.
+
+### Changed
+- **Step 1 matches MP3s by Accession Number** — each CSV row's
+  `Accession Number` is expected as `<Accession Number>.mp3` in
+  `input/mp3/` (the same rule Step 3 uses), replacing the old
+  `Sound_File_N` URL-basename matching. Rows with no Accession Number are
+  logged as a warning; the Step 1 report shows the match rule.
+
+### Fixed
+- **Completed steps are now remembered** — a successful step was marked
+  done only in memory and never written to `project_config.yaml`, so
+  reloading the batch (GUI) or a later CLI run showed it as not done.
+  `StepProcessor.run()` now saves the config after a step succeeds, and the
+  GUI also updates the batch registry so the Batches list progress count
+  is correct.
+- **`run.ps1` failed upgrading pip on Windows** — `pip install --upgrade
+  pip` cannot replace the running `pip.exe`; both install calls now use
+  `python -m pip`.
+
 ## HAM [0.3.1] - 2026-10-13 0934 CDT
 
 ### Fixed

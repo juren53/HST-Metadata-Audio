@@ -5,16 +5,15 @@ Checks that:
   - A CSV file exists in input/csv/
   - MP3 files exist in input/mp3/
   - All REQUIRED_CSV_COLUMNS are present in the CSV
-  - MP3 filenames match Sound_File URLs in the CSV
+  - MP3 filenames match the CSV's Accession Numbers
 
-Matching logic adapted from match-audio-files.py. Each Sound_File_N cell
-may contain a full URL (e.g. https://…/SR62-122.mp3) or a bare filename;
-the URL prefix is stripped to extract the basename for comparison.
+Each MP3 is named for its recording's Accession Number, so the CSV row
+with Accession Number "SR59-108" matches input/mp3/SR59-108.mp3. This is
+the same rule Step 3 uses to look up a file's metadata.
 
 Populates context.shared_data:
   "csv_path"             – Path to the CSV file
-  "sound_file_cols"      – list of Sound_File column names found
-  "matched_mp3s"         – set of MP3 basenames matched to a CSV row
+  "matched_mp3s"         – set of MP3 filenames matched to a CSV row
   "unmatched_csv_files"  – CSV-listed filenames absent from input/mp3/
   "unmatched_mp3_files"  – MP3 files in input/mp3/ with no CSV entry
 """
@@ -27,11 +26,6 @@ from steps.base_step import StepProcessor, ProcessingContext, StepResult
 from utils.validator import ValidationResult
 from config.settings import REQUIRED_CSV_COLUMNS
 from utils.file_utils import read_csv_text
-
-
-def _basename(value: str) -> str:
-    """Strip URL prefix and return bare filename."""
-    return value.strip().split("/")[-1] if isinstance(value, str) else ""
 
 
 class Step1_CSVPrep(StepProcessor):
@@ -75,35 +69,27 @@ class Step1_CSVPrep(StepProcessor):
 
         self.logger.info(f"CSV rows: {len(rows)}  |  Columns: {len(headers)}")
 
-        # 3. Identify Sound_File columns (by name prefix, then by position fallback)
-        sound_cols = [h for h in headers if h.lower().startswith("sound_file")]
-        if not sound_cols:
-            # Fallback: all columns beyond the required set
-            n = len(REQUIRED_CSV_COLUMNS)
-            sound_cols = headers[n:n + 10]
-
-        if not sound_cols:
-            return StepResult(False, "No Sound_File columns found in CSV")
-
-        self.logger.info(f"Sound_File columns ({len(sound_cols)}): {sound_cols[0]} … {sound_cols[-1]}")
-
-        # 4. Collect all CSV-listed MP3 basenames
+        # 3. Expected MP3 filename for each row: <Accession Number>.mp3
         csv_filenames: set[str] = set()
+        blank_rows = 0
         for row in rows:
-            for col in sound_cols:
-                name = _basename(row.get(col, ""))
-                if name.lower().endswith(".mp3"):
-                    csv_filenames.add(name)
+            an = (row.get("Accession Number") or "").strip()
+            if an:
+                csv_filenames.add(f"{an}.mp3")
+            else:
+                blank_rows += 1
 
-        self.logger.info(f"Unique MP3 filenames in CSV: {len(csv_filenames)}")
+        if blank_rows:
+            self.logger.warning(f"{blank_rows} CSV row(s) have no Accession Number")
+        self.logger.info(f"Unique Accession Numbers in CSV: {len(csv_filenames)}")
 
-        # 5. Collect MP3 files present in input/mp3/
+        # 4. Collect MP3 files present in input/mp3/
         mp3_paths = context.paths.get_mp3_files()
         mp3_names: set[str] = {p.name for p in mp3_paths}
 
         self.logger.info(f"MP3 files in input/mp3/: {len(mp3_names)}")
 
-        # 6. Match
+        # 5. Match
         matched_mp3s       = csv_filenames & mp3_names
         unmatched_csv      = sorted(csv_filenames - mp3_names)
         unmatched_mp3      = sorted(mp3_names - csv_filenames)
@@ -117,22 +103,29 @@ class Step1_CSVPrep(StepProcessor):
         for f in unmatched_mp3:
             self.logger.warning(f"  MP3 file has no CSV row: {f}")
 
-        # 7. Write report
-        self._write_report(context, csv_path, rows, sound_cols,
+        # 6. Write report
+        self._write_report(context, csv_path, rows,
                            matched_mp3s, unmatched_csv, unmatched_mp3)
 
-        # 8. Populate shared_data for downstream steps
+        # 7. Populate shared_data for downstream steps
         context.shared_data["csv_path"]            = csv_path
-        context.shared_data["sound_file_cols"]     = sound_cols
         context.shared_data["matched_mp3s"]        = matched_mp3s
         context.shared_data["unmatched_csv_files"] = unmatched_csv
         context.shared_data["unmatched_mp3_files"] = unmatched_mp3
 
         if not matched_mp3s:
-            return StepResult(False, "No MP3 files matched any CSV row — check filenames")
+            return StepResult(False, "No MP3 files matched any CSV Accession Number — "
+                                     "files must be named <Accession Number>.mp3")
 
-        msg = (f"Matched {len(matched_mp3s)} of {len(csv_filenames)} CSV-listed files "
+        msg = (f"Matched {len(matched_mp3s)} of {len(csv_filenames)} CSV Accession Numbers "
                f"({len(mp3_names)} MP3s in input/mp3/)")
+        # Saved with the batch config so the GUI's Input Files panel can show it
+        context.config.set("step_results.step1", {
+            "matched":    len(matched_mp3s),
+            "csv_total":  len(csv_filenames),
+            "mp3_total":  len(mp3_names),
+            "summary":    msg,
+        })
         return StepResult(True, msg, files_processed=len(matched_mp3s))
 
     # ── validate_outputs ──────────────────────────────────────────────────
@@ -147,7 +140,7 @@ class Step1_CSVPrep(StepProcessor):
 
     # ── private ───────────────────────────────────────────────────────────
 
-    def _write_report(self, context, csv_path, rows, sound_cols,
+    def _write_report(self, context, csv_path, rows,
                       matched, unmatched_csv, unmatched_mp3):
         report_path = context.paths.reports_dir / "step1_prep_report.txt"
         try:
@@ -157,7 +150,7 @@ class Step1_CSVPrep(StepProcessor):
                 fh.write("=" * 50 + "\n\n")
                 fh.write(f"CSV file      : {csv_path.name}\n")
                 fh.write(f"CSV rows      : {len(rows)}\n")
-                fh.write(f"Sound_File cols: {', '.join(sound_cols)}\n\n")
+                fh.write("Match rule    : <Accession Number>.mp3\n\n")
                 fh.write(f"Matched       : {len(matched)}\n")
                 fh.write(f"CSV-only      : {len(unmatched_csv)}\n")
                 fh.write(f"MP3-only      : {len(unmatched_mp3)}\n\n")

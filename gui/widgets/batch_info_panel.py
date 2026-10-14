@@ -89,6 +89,8 @@ class BatchInfoPanel(QWidget):
         self._csv_name_val.setWordWrap(True)
         self._csv_size_val = QLabel("—")
         self._mp3_count_val = QLabel("—")
+        self._step1_match_val = QLabel("Step 1 not run yet")
+        self._step1_match_val.setWordWrap(True)
 
         refresh_btn = QPushButton("Refresh")
         refresh_btn.setFixedWidth(80)
@@ -99,6 +101,7 @@ class BatchInfoPanel(QWidget):
         form.addRow("CSV Size:", self._csv_size_val)
         form.addRow("MP3 Files:", self._mp3_count_val)
         form.addRow("", refresh_btn)
+        form.addRow("Step 1 Match:", self._step1_match_val)
         return group
 
     def _build_dir_group(self) -> QGroupBox:
@@ -141,6 +144,10 @@ class BatchInfoPanel(QWidget):
         )
         self._progress_summary.setText(f"{done_count} of 5 steps complete")
 
+        # Last Step 1 match result, saved in the batch config by Step 1
+        summary = config.get("step_results.step1.summary") if config else None
+        self._step1_match_val.setText(summary or "Step 1 not run yet")
+
         # File counts
         self._refresh_file_counts()
 
@@ -151,6 +158,7 @@ class BatchInfoPanel(QWidget):
                     self._csv_name_val, self._csv_size_val, self._mp3_count_val):
             lbl.setText("—")
         self._progress_summary.setText("No batch selected")
+        self._step1_match_val.setText("—")
         self._open_btn.setEnabled(False)
         self._data_dir = None
 

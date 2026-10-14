@@ -337,7 +337,12 @@ class MainWindow(QMainWindow):
     def _on_step_executed(self, step_num: int, success: bool):
         verb = "completed" if success else "failed"
         self.status_bar.showMessage(f"Step {step_num} {verb}", 3000)
+        if success and self.current_batch_id:
+            self.registry.update_step_status(self.current_batch_id, step_num, True)
         self._refresh_batch_list()
+        batch = self.registry.get_batch(self.current_batch_id) if self.current_batch_id else None
+        if batch:
+            self.batch_info_panel.set_batch(self.current_config, self.current_batch_id, batch)
 
     def _on_tab_changed(self, index: int):
         names = ["Batches", "Current Batch", "Configuration", "Logs"]
