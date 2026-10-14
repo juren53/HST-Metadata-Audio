@@ -11,6 +11,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## HAM [0.3.5] - 2026-10-14 1841 CDT
+
+### Fixed
+- **Step 2 rejected nearly every date in real CSV exports** — it only
+  understood the prototype's `DD-MMM-YY` format (`15-Jun-61`), so an
+  export using `May 14, 1948` failed every row with "invalid date".
+  `parse_date()` now accepts, converting to ISO 8601:
+  - `May 14, 1948` → `1948-05-14`
+  - `January, 1952` → `1952-01` (month and year only)
+  - `1961` → `1961` (year only)
+  - ranges such as `September 21, 1946 - October 22, 1947` (often split
+    across two lines in the CSV cell) → ISO 8601 interval
+    `1946-09-21/1947-10-22`; the start date supplies the year and DDMM
+    tags, and line breaks are collapsed in the stored original text
+  - the existing `15-Jun-61` and `1961-06-15`
+
+  Impossible or unrecognized dates (e.g. `February 30, 1950`) still fail
+  Step 2. Verified against `SoundExport2026-09-22.csv`: all 1,194 rows
+  load.
+
+### Changed
+- **Blank dates become `0000-00-00`** — Step 2 logs a warning and
+  continues instead of failing; the MP3 still gets date tags (year and
+  DDMM `0000`), so Step 5's required TRDA frame is present.
+- Step 3 skips the TDAT (DDMM) frame for year-only and month-only dates,
+  and no longer leaves a trailing space after the description when the
+  date is blank.
+
 ## HAM [0.3.4] - 2026-10-14 1831 CDT
 
 ### Added

@@ -88,7 +88,7 @@ class Step3_MetadataEmbed(StepProcessor):
 
                 desc = record["description"]
                 date_orig = record["date_original"]
-                desc_date = f"{desc} {date_orig}"
+                desc_date = f"{desc} {date_orig}".strip()
 
                 tags.update_to_v23()
 
@@ -101,7 +101,8 @@ class Step3_MetadataEmbed(StepProcessor):
                 tags["TCOP"] = TCOP(encoding=3, text=record["restrictions"])
                 tags["TPUB"] = TPUB(encoding=3, text=record["copyright"])
                 tags["TSRC"] = TSRC(encoding=3, text=_STATIC_TSRC)
-                tags["TDAT"] = TDAT(encoding=3, text=record["date_ddmm"])
+                if record["date_ddmm"]:  # partial dates (e.g. "1961") have no DDMM
+                    tags["TDAT"] = TDAT(encoding=3, text=record["date_ddmm"])
                 tags["TYER"] = TYER(encoding=3, text=record["date_year"])
                 tags["TORY"] = TORY(encoding=3, text=record["date_year"])
                 tags["TRDA"] = TRDA(encoding=3, text=record["date_iso"])

@@ -1,8 +1,9 @@
 """
 Step 2 – CSV Validation & Date Conversion
 
-Reads the CSV metadata file, converts dates from DD-MMM-YY → ISO 8601,
-validates field completeness, and stores a clean record list in context.
+Reads the CSV metadata file, converts dates to ISO 8601 (see parse_date
+for the accepted formats; blank dates become 0000-00-00), validates field
+completeness, and stores a clean record list in context.
 
 Extracted from audio-tags-12d.py (v0.12d).
 """
@@ -10,8 +11,9 @@ Extracted from audio-tags-12d.py (v0.12d).
 import csv
 import datetime
 import io
+import re
 from pathlib import Path
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Tuple
 
 from steps.base_step import StepProcessor, ProcessingContext, StepResult
 from utils.validator import ValidationResult
@@ -24,29 +26,90 @@ _MONTH_MAP = {
     "Jul": 7, "Aug": 8, "Sep": 9, "Oct": 10, "Nov": 11, "Dec": 12,
 }
 
+# Stored for rows with no Date, so every MP3 still gets date tags
+BLANK_DATE_ISO = "0000-00-00"
 
-def parse_date(date_str: str) -> Optional[datetime.date]:
-    """Convert DD-MMM-YY (e.g. '15-Jun-61') to a datetime.date, or None."""
-    parts = date_str.strip().split("-")
-    if len(parts) != 3:
-        return None
-    day_s, mon_s, yr_s = parts
-    month_num = _MONTH_MAP.get(mon_s[:3])
-    if month_num is None:
-        return None
+_RE_DD_MMM_YY   = re.compile(r"^(\d{1,2})-([A-Za-z]{3,})-(\d{2}|\d{4})$")   # 15-Jun-61
+_RE_MONTH_D_Y   = re.compile(r"^([A-Za-z]{3,})\.? (\d{1,2}), (\d{4})$")     # May 14, 1948
+_RE_MONTH_Y     = re.compile(r"^([A-Za-z]{3,})\.?,? (\d{4})$")              # January, 1952
+_RE_YEAR        = re.compile(r"^(\d{4})$")                                  # 1961
+_RE_ISO         = re.compile(r"^(\d{4})-(\d{2})-(\d{2})$")                  # 1961-06-15
+
+
+def _month(name: str) -> Optional[int]:
+    return _MONTH_MAP.get(name[:3].capitalize())
+
+
+def _parse_single(text: str) -> Optional[Tuple[int, Optional[int], Optional[int]]]:
+    """Parse one date to (year, month, day); month/day are None for
+    partial dates. Returns None if the text isn't a recognized date."""
     try:
-        year = int(yr_s)
-        if year < 100:
-            year += 1900
-        return datetime.date(year, month_num, int(day_s))
+        if m := _RE_MONTH_D_Y.match(text):
+            mon, day, year = _month(m[1]), int(m[2]), int(m[3])
+        elif m := _RE_DD_MMM_YY.match(text):
+            day, mon, year = int(m[1]), _month(m[2]), int(m[3])
+            if year < 100:
+                year += 1900
+        elif m := _RE_ISO.match(text):
+            year, mon, day = int(m[1]), int(m[2]), int(m[3])
+        elif m := _RE_MONTH_Y.match(text):
+            mon = _month(m[1])
+            if mon is None:
+                return None
+            return int(m[2]), mon, None
+        elif m := _RE_YEAR.match(text):
+            return int(m[1]), None, None
+        else:
+            return None
+        if mon is None:
+            return None
+        datetime.date(year, mon, day)  # reject impossible dates like Feb 30
+        return year, mon, day
     except ValueError:
         return None
 
 
+def _iso(year: int, mon: Optional[int], day: Optional[int]) -> str:
+    """ISO 8601, reduced precision for partial dates: 1961, 1961-06, 1961-06-15."""
+    if mon is None:
+        return f"{year:04d}"
+    if day is None:
+        return f"{year:04d}-{mon:02d}"
+    return f"{year:04d}-{mon:02d}-{day:02d}"
+
+
+def parse_date(date_str: str) -> Optional[Dict[str, str]]:
+    """Convert a CSV Date cell to the date fields Step 3 embeds.
+
+    Accepts "May 14, 1948", "January, 1952", "1961", "15-Jun-61",
+    "1961-06-15", and ranges of any of these ("A - B", possibly split
+    across lines). A range is stored as an ISO 8601 interval (A/B); its
+    start date supplies the year and DDMM tags. Returns None if the text
+    isn't a recognized date. A blank cell is handled by the caller.
+    """
+    text = " ".join(date_str.split())  # collapse line breaks and runs of spaces
+    parts = [p.strip() for p in text.split(" - ")]
+    if len(parts) > 2:
+        return None
+    parsed = [_parse_single(p) for p in parts]
+    if any(p is None for p in parsed):
+        return None
+
+    year, mon, day = parsed[0]
+    iso = "/".join(_iso(*p) for p in parsed)
+    return {
+        "date_original": text,
+        "date_iso":      iso,
+        "date_year":     f"{year:04d}",
+        # TDAT is DDMM; only a full date has one
+        "date_ddmm":     f"{day:02d}{mon:02d}" if day else "",
+    }
+
+
 def iso_date(date_str: str) -> Optional[str]:
-    """Return ISO 8601 string (YYYY-MM-DD) or None."""
+    """Return the ISO 8601 form of a CSV Date cell, or None."""
     d = parse_date(date_str)
-    return d.isoformat() if d else None
+    return d["date_iso"] if d else None
 
 
 class Step2_CSVValidation(StepProcessor):
@@ -96,18 +159,21 @@ class Step2_CSVValidation(StepProcessor):
                         continue
 
                     # Date conversion
-                    dt = parse_date(date_str)
-                    if dt is None:
-                        errors.append(f"Row {line_num} ({an}): invalid date '{date_str}'")
-                        continue
+                    if not date_str:
+                        warnings.append(f"Row {line_num} ({an}): no Date — "
+                                        f"using {BLANK_DATE_ISO}")
+                        dates = {"date_original": "", "date_iso": BLANK_DATE_ISO,
+                                 "date_year": "0000", "date_ddmm": "0000"}
+                    else:
+                        dates = parse_date(date_str)
+                        if dates is None:
+                            errors.append(f"Row {line_num} ({an}): invalid date '{date_str}'")
+                            continue
 
                     records.append({
                         "accession_number": an,
                         "title":            row.get("title", "").strip(),
-                        "date_original":    date_str,
-                        "date_iso":         dt.isoformat(),
-                        "date_year":        str(dt.year),
-                        "date_ddmm":        f"{dt.day:02d}{dt.month:02d}",
+                        **dates,
                         "restrictions":     row.get("Restrictions", "").strip(),
                         "description":      row.get("Description", "").strip(),
                         "place":            row.get("Place", "").strip(),
