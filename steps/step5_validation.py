@@ -18,6 +18,7 @@ from typing import Dict, List, Optional, Tuple
 
 from steps.base_step import StepProcessor, ProcessingContext, StepResult
 from utils.validator import ValidationResult
+from steps.step2_csv_validation import load_records
 
 
 _MIN_FILE_BYTES = 10_000          # 10 KB  — suspiciously small
@@ -135,7 +136,7 @@ class Step5_Validation(StepProcessor):
 
     def execute(self, context: ProcessingContext) -> StepResult:
         mp3_files = sorted(context.paths.processed_dir.glob("*.mp3"))
-        records: List[dict] = context.get_data("csv_records") or []
+        records: List[dict] = load_records(context) or []
         record_map = {r["accession_number"]: r for r in records}
 
         passed_files, failed_files = [], []

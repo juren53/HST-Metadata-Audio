@@ -11,6 +11,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## HAM [0.3.6] - 2026-10-14 1851 CDT
+
+### Added
+- **`Date ISO` column in the batch CSV** — Step 2 now writes each row's
+  converted date (e.g. `1948-05-14`, `1961`, `1946-09-21/1947-10-22`,
+  `0000-00-00`) into a `Date ISO` column inserted right after `Date` in
+  the batch's copy of the CSV (`input/csv/`). `Date` is left unchanged, so
+  the human-readable text still goes into the description/comment and
+  ICRD tags. Re-running Step 2 overwrites the column rather than adding
+  another; if any date fails to convert, the CSV is not rewritten. The
+  user's original export (outside the batch) is never modified.
+
+### Fixed
+- **Steps 3 and 5 no longer depend on Step 2 running in the same session**
+  — Step 2's records were held only in memory, and every GUI step run (and
+  every CLI invocation) gets a fresh context, so running Step 3 by itself
+  failed with "No CSV records found. Run Step 2 first." New
+  `load_records()` in `steps/step2_csv_validation.py` rebuilds the records
+  from the CSV's `Date ISO` column when they aren't already in memory;
+  Step 3 and Step 5 use it.
+- Step 2 reads and writes the CSV as plain rows, so exports with a
+  repeated header (the sample export has two `Recording Speed` columns)
+  keep both columns. Verified on `SoundExport2026-09-22.csv`: 27 → 28
+  columns, all 1,194 records, every original cell unchanged.
+
 ## HAM [0.3.5] - 2026-10-14 1841 CDT
 
 ### Fixed

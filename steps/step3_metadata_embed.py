@@ -2,7 +2,8 @@
 Step 3 – Metadata Tag Embedding
 
 Copies MP3 files from input/mp3/ → output/tmp/, then uses Mutagen to write
-ID3v2.3 tags for each record from the validated CSV (Step 2 output).
+ID3v2.3 tags for each record from the validated CSV (Step 2 output: the
+batch CSV with its Date ISO column).
 
 Tag mappings are drawn from the ATW prototype (audio-tags-12d.py) and the
 field table in docs/HSTL_Audio_Framework-Development_Plan.md.
@@ -15,6 +16,7 @@ from typing import Dict, List
 
 from steps.base_step import StepProcessor, ProcessingContext, StepResult
 from utils.validator import ValidationResult
+from steps.step2_csv_validation import load_records
 
 _TOOL_VERSION = "HAM v0.1.0"
 _STATIC_ARTIST = "Harry S. Truman Library"
@@ -43,9 +45,9 @@ class Step3_MetadataEmbed(StepProcessor):
         result = ValidationResult()
         if not _check_mutagen():
             result.add_error("mutagen is not installed. Run: pip install mutagen")
-        records = context.get_data("csv_records")
+        records = load_records(context)
         if not records:
-            result.add_error("No CSV records found. Run Step 2 first.")
+            result.add_error("CSV has no converted dates (Date ISO column). Run Step 2 first.")
         mp3s = list(context.paths.input_mp3_dir.glob("*.mp3"))
         if not mp3s:
             result.add_error(f"No MP3 files found in {context.paths.input_mp3_dir}")
