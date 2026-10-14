@@ -11,6 +11,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## HAM [0.3.7] - 2026-10-14 1857 CDT
+
+### Documentation
+- **Date range handling (decided 2026-10-14)** — for a `Date` holding a
+  range, e.g. `September 21, 1946 - October 22, 1947`:
+  - `Date ISO` / TRDA hold the full ISO 8601 interval,
+    `1946-09-21/1947-10-22`
+  - **the start date is used** for TYER/TORY (`1946`) and TDAT (`2109`)
+  - ICRD and the description/comment tags keep the original text, with
+    the CSV cell's line break collapsed to a single line
+
+  The prototype (`audio-tags-12d.py`) had no range logic: its split on `-`
+  never yields exactly three parts for a range, so those rows were
+  skipped and their MP3s left untagged.
+
 ## HAM [0.3.6] - 2026-10-14 1851 CDT
 
 ### Added
