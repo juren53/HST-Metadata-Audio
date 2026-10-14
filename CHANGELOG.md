@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## HAM [0.4.0] - 2026-10-14 1348 CDT
+## HAM [0.3.2] - 2026-10-14 1348 CDT
 
 ### Added
 - **Step 1 match result in the Current Batch panel** — the Input Files
