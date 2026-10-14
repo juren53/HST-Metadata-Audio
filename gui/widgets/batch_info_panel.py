@@ -94,9 +94,13 @@ class BatchInfoPanel(QWidget):
         self._csv_val = QLabel("—")
         self._csv_val.setWordWrap(True)
         self._mp3_count_val = QLabel("—")
+        self._csv_src_val = self._path_label()
+        self._mp3_src_val = self._path_label()
 
         form.addRow("CSV:", self._csv_val)
+        form.addRow("CSV from:", self._csv_src_val)
         form.addRow("MP3s:", self._mp3_count_val)
+        form.addRow("MP3s from:", self._mp3_src_val)
 
         line = QFrame()
         line.setFrameShape(QFrame.Shape.HLine)
@@ -123,6 +127,26 @@ class BatchInfoPanel(QWidget):
         refresh_btn.clicked.connect(self._refresh_file_counts)
         vbox.addWidget(refresh_btn, alignment=Qt.AlignmentFlag.AlignRight)
         return group
+
+    @staticmethod
+    def _path_label() -> QLabel:
+        lbl = QLabel("—")
+        lbl.setWordWrap(True)
+        lbl.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        return lbl
+
+    @staticmethod
+    def _set_paths(lbl: QLabel, paths: list[str]):
+        """Show source folders one per line; a zero-width space after each
+        separator lets long paths wrap instead of widening the panel."""
+        if not paths:
+            lbl.setText("—")
+            lbl.setToolTip("")
+            return
+        zwsp = "\u200b"
+        lbl.setText("\n".join(p.replace("\\", "\\" + zwsp).replace("/", "/" + zwsp)
+                              for p in paths))
+        lbl.setToolTip("\n".join(paths))
 
     def _build_dir_group(self) -> QGroupBox:
         group = QGroupBox("Data Directory")
@@ -164,6 +188,12 @@ class BatchInfoPanel(QWidget):
         )
         self._progress_summary.setText(f"{done_count} of 5 steps complete")
 
+        # Folders the CSV and MP3s were imported from (recorded by Step1Dialog)
+        csv_src = config.get("input_sources.csv_dir") if config else None
+        mp3_srcs = config.get("input_sources.mp3_dirs") if config else None
+        self._set_paths(self._csv_src_val, [csv_src] if csv_src else [])
+        self._set_paths(self._mp3_src_val, list(mp3_srcs or []))
+
         # Last Step 1 match result
         self._show_step1_match(config.get("step_results.step1") if config else None)
 
@@ -176,6 +206,8 @@ class BatchInfoPanel(QWidget):
                     self._created_val, self._accessed_val, self._dir_val,
                     self._csv_val, self._mp3_count_val):
             lbl.setText("—")
+        self._set_paths(self._csv_src_val, [])
+        self._set_paths(self._mp3_src_val, [])
         self._show_step1_match(None)
         self._progress_summary.setText("No batch selected")
         self._open_btn.setEnabled(False)

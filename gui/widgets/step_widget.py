@@ -144,7 +144,8 @@ class StepWidget(QWidget):
 
             data_dir = Path(self.config.get("project.data_directory"))
             paths = PathManager(data_dir)
-            dialog = Step1Dialog(paths, parent=self, batch_id=self.batch_id)
+            dialog = Step1Dialog(paths, parent=self, batch_id=self.batch_id,
+                                 config=self.config)
             if dialog.exec() != QDialog.DialogCode.Accepted:
                 self._run_all_active = False  # don't leave "Run All" stuck
                 return

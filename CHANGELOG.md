@@ -11,6 +11,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## HAM [0.3.4] - 2026-10-14 1831 CDT
+
+### Added
+- **Source folders in the Input Files panel** — new `CSV from:` and
+  `MP3s from:` rows show where the batch's CSV and MP3 files were imported
+  from. `Step1Dialog` records them in the batch's `project_config.yaml`
+  under `input_sources.csv_dir` and `input_sources.mp3_dirs`; MP3 imports
+  are additive, so every source folder is listed (once each). Long paths
+  wrap, and the tooltip shows the full paths.
+- **Step 1 file pickers remember the last folder** — *Browse CSV…* and
+  *Import MP3 Folder…* each open in the folder last chosen with them
+  (saved in HAM's QSettings as `step1/last_csv_dir` and
+  `step1/last_mp3_dir`), falling back to Downloads as HPM's Step 1 does.
+
+### Changed
+- `Step1Dialog` now takes the batch's `ConfigManager` (`config=`), passed
+  by `StepWidget`, so recording source folders shares the same in-memory
+  config that Step 1 saves afterward.
+
 ## HAM [0.3.3] - 2026-10-14 1405 CDT
 
 ### Changed

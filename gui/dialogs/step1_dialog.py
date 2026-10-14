@@ -26,7 +26,7 @@ from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QTextEdit, QProgressBar, QDialogButtonBox, QFileDialog, QMessageBox,
 )
-from PyQt6.QtCore import QThread, pyqtSignal
+from PyQt6.QtCore import QThread, pyqtSignal, QSettings
 
 from config.settings import REQUIRED_CSV_COLUMNS
 from utils.file_utils import safe_copy, find_csv, count_mp3s, read_csv_text
@@ -82,11 +82,15 @@ class Step1ImportThread(QThread):
 class Step1Dialog(QDialog):
     """Dialog for Step 1: CSV & MP3 Preparation."""
 
-    def __init__(self, paths, parent=None, batch_id=None):
+    def __init__(self, paths, parent=None, batch_id=None, config=None):
         super().__init__(parent)
         self.paths = paths
         self.batch_id = batch_id
+        # The batch's ConfigManager — source folders are recorded in it
+        self.config = config
+        self.settings = QSettings("HSTL", "AudioMetadata")
         self._import_thread = None
+        self._import_source = None
 
         self.setWindowTitle("Step 1: CSV & MP3 Preparation")
         self.setMinimumWidth(620)
@@ -170,17 +174,41 @@ class Step1Dialog(QDialog):
         if not busy:
             self._refresh_status()
 
+    def _start_dir(self, key: str) -> str:
+        """Last folder used for this picker, falling back to Downloads."""
+        last = self.settings.value(key, "", type=str)
+        if last and Path(last).is_dir():
+            return last
+        downloads = Path.home() / "Downloads"
+        return str(downloads) if downloads.is_dir() else ""
+
+    def _record_source(self, key: str, folder: str, append: bool = False):
+        """Save a source folder in the batch config so the Current Batch
+        panel can show where the input files came from."""
+        if self.config is None or not self.config.config_path:
+            return
+        if append:
+            folders = list(self.config.get(key) or [])
+            if folder not in folders:
+                folders.append(folder)
+            self.config.set(key, folders)
+        else:
+            self.config.set(key, folder)
+        self.config.save_config(self.config.config_data, self.config.config_path)
+
     # ------------------------------------------------------------------
     # CSV import
     # ------------------------------------------------------------------
 
     def _browse_csv(self):
         file_path, _ = QFileDialog.getOpenFileName(
-            self, "Select CSV Metadata File", "", "CSV Files (*.csv);;All Files (*)"
+            self, "Select CSV Metadata File", self._start_dir("step1/last_csv_dir"),
+            "CSV Files (*.csv);;All Files (*)"
         )
         if not file_path:
             return
         src = Path(file_path)
+        self.settings.setValue("step1/last_csv_dir", str(src.parent))
 
         try:
             text, encoding = read_csv_text(src)
@@ -214,6 +242,7 @@ class Step1Dialog(QDialog):
             dst.write_text(text, encoding="utf-8", newline="")
             note = "" if encoding == "utf-8-sig" else f" (converted from {encoding} to UTF-8)"
             self.output_text.append(f"✓ Copied CSV: {src.name}{note}")
+            self._record_source("input_sources.csv_dir", str(src.parent))
         except OSError:
             QMessageBox.critical(self, "Copy Failed", f"Could not copy {src.name} into the batch.")
         self._refresh_status()
@@ -223,9 +252,14 @@ class Step1Dialog(QDialog):
     # ------------------------------------------------------------------
 
     def _browse_mp3_folder(self):
-        folder = QFileDialog.getExistingDirectory(self, "Select MP3 Source Folder", "")
+        folder = QFileDialog.getExistingDirectory(
+            self, "Select MP3 Source Folder", self._start_dir("step1/last_mp3_dir")
+        )
         if not folder:
             return
+        folder = str(Path(folder))  # native separators, matching the CSV folder
+        self.settings.setValue("step1/last_mp3_dir", folder)
+        self._import_source = folder
 
         self.paths.input_mp3_dir.mkdir(parents=True, exist_ok=True)
         self.output_text.append(f"Importing MP3 files from: {folder}")
@@ -242,6 +276,8 @@ class Step1Dialog(QDialog):
             f"✓ Import complete: {stats['copied']} copied, {stats['skipped']} already present, "
             f"{stats['failed']} failed (of {stats['total']} found)"
         )
+        # Imports are additive, so a batch can have more than one MP3 source folder
+        self._record_source("input_sources.mp3_dirs", self._import_source, append=True)
         self._set_busy(False)
 
     def _on_import_error(self, message: str):
