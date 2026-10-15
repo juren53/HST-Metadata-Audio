@@ -5,6 +5,7 @@ block_cipher = None
 datas = [
     ('__init__.py', '.'),
     ('gui/resources/icons', 'gui/resources/icons'),
+    ('assets/HST-blank-album-art.jpg', 'assets'),   # Step 4 album-art template
 ]
 
 hiddenimports = [

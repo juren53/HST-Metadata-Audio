@@ -29,6 +29,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in the involvement (role) slot, so ATW showed "Truman, Harry S.,
   1884-1972:". IPLS pairs are (involvement, person); the role is now
   blank and the name in the person slot.
+- **HAM.exe: Step 4 failed with "Base album art not found"** — the
+  album-art template `assets/HST-blank-album-art.jpg` wasn't bundled in
+  the exe, so `output/processed/` stayed empty. `HAM.spec` now includes it.
+- **HAM.exe forgot batches between launches** — the batch registry lived
+  in the exe's temporary `_MEIPASS` folder, which is replaced on every
+  launch. It now lives at
+  `~/.hstl_audio_framework/config/batch_registry.yaml` (as HPM's does),
+  shared by the source and exe versions; on first run an existing registry
+  from the app's `config/` folder is copied over.
 
 Verified: Steps 3 → 4 → 5 on real MP3s pass, processed files keep their
 full audio (e.g. `SR59-16.mp3` 31,502,380 bytes), and ATW opens them in

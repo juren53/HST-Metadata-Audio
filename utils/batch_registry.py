@@ -1,10 +1,15 @@
 """
 Batch Registry for HAM.
 
-Central YAML registry at <framework_root>/config/batch_registry.yaml that
-tracks all batch projects across sessions.
+Central YAML registry at ~/.hstl_audio_framework/config/batch_registry.yaml
+that tracks all batch projects across sessions. It lives in the user's home
+folder, as HPM's does, because in the PyInstaller exe the app's own folder
+is a temporary _MEIPASS directory replaced on every launch; the home
+location is also shared by the source and exe versions.
 """
 
+import shutil
+import sys
 import uuid
 import yaml
 from datetime import datetime
@@ -22,11 +27,26 @@ class BatchRegistry:
     STATUS_COMPLETED = "completed"
     STATUS_ARCHIVED = "archived"
 
-    def __init__(self, framework_root: Optional[Path] = None):
-        if framework_root is None:
-            framework_root = Path(__file__).parent.parent
-        self.registry_path = Path(framework_root) / "config" / _REGISTRY_FILENAME
+    def __init__(self, registry_path: Optional[Path] = None):
+        if registry_path is None:
+            registry_path = Path.home() / ".hstl_audio_framework" / "config" / _REGISTRY_FILENAME
+            if not registry_path.exists():
+                self._migrate_old_registry(registry_path)
+        self.registry_path = Path(registry_path)
         self.batches: Dict[str, dict] = self._load_registry()
+
+    @staticmethod
+    def _migrate_old_registry(new_path: Path):
+        """First run with the home-folder registry: copy over the one that
+        used to live in the app's own config/ folder (ported from HPM)."""
+        if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+            old_root = Path(sys._MEIPASS)
+        else:
+            old_root = Path(__file__).parent.parent
+        old_path = old_root / "config" / _REGISTRY_FILENAME
+        if old_path.exists():
+            new_path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(old_path, new_path)
 
     # ------------------------------------------------------------------
     # CRUD

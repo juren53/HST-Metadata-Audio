@@ -50,7 +50,7 @@ class MainWindow(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.registry = BatchRegistry(_ROOT)
+        self.registry = BatchRegistry()
         self.current_batch_id: str = ""
         self.current_config: ConfigManager = None
         self.settings = QSettings("HSTL", "AudioMetadata")
