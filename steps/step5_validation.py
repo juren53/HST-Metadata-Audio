@@ -69,6 +69,17 @@ def _validate_file(
     elif size > _MAX_FILE_BYTES:
         errors.append(f"File suspiciously large ({_size_str(size)})")
 
+    # --- audio stream ---
+    try:
+        from mutagen.mp3 import MP3
+        length = MP3(str(mp3_path)).info.length
+        info.append(f"  audio:  {length / 60:.1f} min")
+        if length <= 0:
+            errors.append("No audio (zero length)")
+    except Exception as exc:
+        errors.append(f"No readable MP3 audio: {exc}")
+        info.append("  audio:  UNREADABLE")
+
     # --- open ID3 ---
     try:
         tags = ID3(str(mp3_path), translate=False)  # translate=False keeps v2.3 date frames (TRDA/TDAT) as-is

@@ -184,9 +184,10 @@ class Step3_MetadataEmbed(StepProcessor):
                 tags["TXXX:TLOC"] = TXXX(encoding=3, desc="TLOC", text=record["place"])
                 tags["TXXX:ICRD"] = TXXX(encoding=3, desc="ICRD", text=date_orig)
 
-                # IPLS: Involved People List (ID3v2.3 only) — Speakers field
+                # IPLS: Involved People List (ID3v2.3 only) — Speakers field.
+                # Pairs are (involvement, person); no role, so involvement is blank.
                 if record["speakers"]:
-                    tags["IPLS"] = IPLS(encoding=3, people=[[record["speakers"], ""]])
+                    tags["IPLS"] = IPLS(encoding=3, people=[["", record["speakers"]]])
 
                 tags.save(str(dst_mp3), v2_version=3)
 

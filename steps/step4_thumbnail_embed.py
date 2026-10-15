@@ -12,6 +12,7 @@ For each tagged MP3 in output/tmp/ (Step 3 output):
 No FFmpeg required — pure Pillow + Mutagen.
 """
 
+import shutil
 from io import BytesIO
 from pathlib import Path
 
@@ -121,8 +122,12 @@ class Step4_ThumbnailEmbed(StepProcessor):
                 continue
 
             try:
+                # Copy the whole MP3 first, then tag the copy: saving an ID3
+                # object to a path that doesn't exist yet writes a tag-only
+                # file with no audio.
+                shutil.copy2(src, dst)
                 try:
-                    tags = ID3(str(src), translate=False)  # translate=False keeps v2.3 date frames (TRDA/TDAT) as-is
+                    tags = ID3(str(dst), translate=False)  # translate=False keeps v2.3 date frames (TRDA/TDAT) as-is
                 except ID3NoHeaderError:
                     tags = ID3()
 
@@ -135,12 +140,21 @@ class Step4_ThumbnailEmbed(StepProcessor):
                     data=jpeg_bytes,
                 )
                 tags.save(str(dst), v2_version=3)
+
+                # Confirm the output still holds the audio, not just a tag
+                from mutagen.mp3 import MP3
+                out_len = MP3(str(dst)).info.length
+                in_len = MP3(str(src)).info.length
+                if abs(out_len - in_len) > 1:
+                    raise ValueError(f"audio length {out_len:.0f}s, expected {in_len:.0f}s")
+
                 ok.append(dst)
                 self.logger.info(f"Album art embedded: {an}")
 
             except Exception as e:
                 self.logger.error(f"APIC embed failed for {an}: {e}")
                 failed.append(src.name)
+                dst.unlink(missing_ok=True)  # don't leave a broken file in processed/
 
         msg = f"Embedded album art in {len(ok)} files; failed {len(failed)}"
         self.logger.info(msg)

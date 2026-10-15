@@ -11,6 +11,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## HAM [0.3.9] - 2026-10-14 2139 CDT
+
+### Fixed
+- **Step 4 wrote tag-only files with no audio** — it loaded the tags from
+  `output/tmp/X.mp3` and saved them to `output/processed/X.mp3` before
+  that file existed, so Mutagen created a new ~35 KB file holding only the
+  ID3 tag and album art. ATW could not open these ("can't sync to MPEG
+  frame"), though exiftool still listed the tags. Step 4 now copies the
+  MP3 into `processed/` first and tags the copy, then checks the output's
+  audio length matches the source (a mismatch fails that file and removes
+  it). Present since Step 4 was first implemented.
+- **Step 5 now checks for readable MP3 audio** — a tag-only file passed
+  its 10 KB size floor; it now fails with "No readable MP3 audio". The
+  report shows each file's audio length.
+- **Speakers (IPLS) pair was reversed** — Step 3 stored the speaker name
+  in the involvement (role) slot, so ATW showed "Truman, Harry S.,
+  1884-1972:". IPLS pairs are (involvement, person); the role is now
+  blank and the name in the person slot.
+
+Verified: Steps 3 → 4 → 5 on real MP3s pass, processed files keep their
+full audio (e.g. `SR59-16.mp3` 31,502,380 bytes), and ATW opens them in
+Archival Recording mode with Speakers and Date Recorded read correctly.
+
 ## HAM [0.3.8] - 2026-10-14 2050 CDT
 
 ### Added
