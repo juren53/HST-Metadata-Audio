@@ -2,12 +2,15 @@
 Step 4 – Album Art Embedding
 
 For each tagged MP3 in output/tmp/ (Step 3 output):
-  1. Open assets/HST-thumbnail-c.png with Pillow
+  1. Open assets/HST-blank-album-art.jpg with Pillow
   2. Draw the accession number in Arial Bold 32 / yellow / x=10,y=10
      with a semi-transparent black background box for legibility
   3. Encode the result as JPEG (BytesIO, quality=90)
-  4. Open the MP3 with Mutagen ID3; add / replace APIC front-cover frame
-  5. Save to output/processed/ as ID3v2.3
+  4. Copy the MP3 to output/processed/, then open the copy with Mutagen
+     ID3 (translate=False, keeping the v2.3 date frames); add / replace
+     the APIC front-cover frame
+  5. Save as ID3v2.3 and check the output's audio length matches the
+     source; a failed file is removed from output/processed/
 
 No FFmpeg required — pure Pillow + Mutagen.
 """
