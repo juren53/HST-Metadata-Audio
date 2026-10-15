@@ -15,14 +15,18 @@ Metadata is written using **[Mutagen](https://mutagen.readthedocs.io/)** — a p
 | 1 | CSV Preparation & Validation | Implemented |
 | 2 | CSV Validation & Date Conversion | Implemented |
 | 3 | Metadata Tag Embedding | Implemented |
-| 4 | Album Art Embedding | Stub |
-| 5 | Output Validation & Reporting | Stub |
+| 4 | Album Art Embedding | Implemented |
+| 5 | Output Validation & Reporting | Implemented |
 
-**Step 2** reads the CSV, validates all required fields, and converts dates from `DD-MMM-YY` format to ISO 8601.
+**Step 1** copies the CSV export into the batch and imports MP3s from one or more source folders, matching each CSV row to `<Accession Number>.mp3`. The match result (matched / no MP3 / no CSV row) and the source folders are shown in the Current Batch → Input Files panel.
 
-**Step 3** embeds all ID3v2.3 tag frames via Mutagen — including title, date, description, speakers, copyright, ISRC, genre, and custom TXXX frames — then saves each MP3 with `v2_version=3`. Original files are backed up to `output/tmp/` before any writes.
+**Step 2** validates the required fields and converts dates to ISO 8601, writing them to a new `Date ISO` column in the batch's copy of the CSV so later steps can run in separate sessions. Accepted formats include `May 14, 1948`, `January, 1952`, `1961`, `1961-06-15` and the legacy `15-Jun-61`. Date ranges (`X - Y`) are stored as ISO intervals (`1946-09-21/1947-10-22`), with the start date used for the year and DDMM tags. Blank dates become `0000-00-00` with a warning; any unparseable date fails the step.
 
-**Step 4** will use Pillow to overlay the accession number on the base thumbnail image (`HST-thumbnail-c.png`) and embed the result as an APIC (album art) frame.
+**Step 3** copies each matched MP3 to `output/tmp/` and embeds the ID3v2.3 frames listed below via Mutagen (originals in `input/` are never modified). Every file is read back and checked against the CSV, an external spot check is run with exiftool (ffprobe fallback), and a summary is written to `reports/step3_tag_report.txt`.
+
+**Step 4** uses Pillow to draw the accession number on the album-art template (`assets/HST-blank-album-art.jpg`), embeds it as an APIC front-cover frame, and saves the finished MP3 to `output/processed/`. Each output's audio length is checked against its source.
+
+**Step 5** checks every file in `output/processed/` — readable audio, file size, required frames (TIT2, TALB, TPE1, TRDA, TCON), album art, and title/album against the CSV — and writes a timestamped report to `reports/`.
 
 ## Running HAM
 
@@ -50,11 +54,14 @@ python hstl_audio.py --help
 # Initialize a new batch
 python hstl_audio.py init "Round 4" --data-dir "C:\path\to\data"
 
-# Run all steps
-python hstl_audio.py run --all
+# List batches
+python hstl_audio.py batches
+
+# Run all steps (--config goes before the subcommand)
+python hstl_audio.py --config "C:\path\to\batch\config\project_config.yaml" run --all
 
 # Run a specific step
-python hstl_audio.py run --step 3
+python hstl_audio.py --config "C:\path\to\batch\config\project_config.yaml" run --step 3
 
 # Check dependency status
 python hstl_audio.py validate --dependencies
@@ -65,15 +72,18 @@ python hstl_audio.py validate --dependencies
 | Field | ID3 Frame | Notes |
 |---|---|---|
 | `title` | TIT2 | Recording title |
-| `Accession Number` | TSRC, TOFN, TXXX:ISBJ, TXXX:IPRD | Multiple frames |
-| `Date` | TDAT, TYER, TORY, TRDA, TXXX:ICRD | DD-MMM-YY → ISO 8601 |
-| `Restrictions` | TIT3 | Subtitle / access note |
-| `Description` | COMM, TEXT | Comment and lyrics frames |
+| `Accession Number` | TALB, TOFN, TXXX:IPRD | TOFN is `<Accession Number>.mp3`; also drawn on the album art |
+| `Date` (via `Date ISO`) | TRDA, TYER, TORY, TDAT | TRDA = ISO date or interval; TDAT (DDMM) only for full dates |
+| `Date` (original text) | TXXX:ICRD | As entered in the CSV |
+| `Description` + `Date` | TIT3, COMM, TXXX:ISBJ | Description followed by the original date |
+| `Restrictions` | TCOP | Access / copyright note |
+| `Production and Copyright` | TPUB | Publisher |
 | `Place` | TXXX:TLOC | Custom location frame |
-| `Speakers` | IPLS | Involved people list |
-| `Production and Copyright` | TCOP, TPUB, WOAS, WXXX | Copyright + publisher |
+| `Speakers` | IPLS | Stored as (involvement, person) with a blank involvement |
 
-All tags saved as **ID3v2.3** (required for TDAT, TRDA, TORY, TYER, IPLS frames).
+Fixed values on every file: TPE1 `Harry S. Truman Library`, TIT1 `NARA-HST-SRC Sound Recordings Collection`, TCON `speech`, TSRC `Harry S. Truman Library`, WOAS (Library sound-recordings page), WXXX (NARA catalog), and TEXT `HAM v<version>`.
+
+All tags are saved as **ID3v2.3** (required for the TDAT, TRDA, TORY, TYER and IPLS frames). Read them back with `ID3(path, translate=False)` — Mutagen's default load converts the v2.3 date frames to v2.4 ones.
 
 ## Project Structure
 
@@ -82,8 +92,12 @@ Audio/
 ├── ham_gui.py                 # PyQt6 GUI launcher
 ├── hstl_audio.py              # CLI entry point
 ├── run.ps1                    # PowerShell launcher (venv + deps)
+├── HAM.spec                   # PyInstaller build for HAM.exe
+├── version_info.txt           # Windows exe version resource
 ├── requirements.txt
 ├── __init__.py                # Version constants
+├── assets/
+│   └── HST-blank-album-art.jpg  # Step 4 album-art template
 ├── config/
 │   ├── config_manager.py      # YAML-backed batch configuration
 │   └── settings.py            # Defaults and required CSV columns
@@ -94,10 +108,10 @@ Audio/
 │   ├── step1_csv_prep.py      # CSV prep & MP3 matching
 │   ├── step2_csv_validation.py
 │   ├── step3_metadata_embed.py
-│   ├── step4_thumbnail_embed.py  # Stub
-│   └── step5_validation.py    # Stub
+│   ├── step4_thumbnail_embed.py  # Album art (APIC)
+│   └── step5_validation.py    # Output checks & report
 ├── utils/
-│   ├── batch_registry.py      # YAML batch registry
+│   ├── batch_registry.py      # YAML batch registry (~/.hstl_audio_framework/config)
 │   ├── path_manager.py        # Batch directory layout
 │   ├── logger.py              # HAMLogger with SUCCESS level
 │   ├── validator.py           # ValidationResult dataclass
