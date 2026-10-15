@@ -26,6 +26,14 @@ Metadata is written using **[Mutagen](https://mutagen.readthedocs.io/)** — a p
 
 ## Running HAM
 
+### Windows executable
+
+Download `HAM.exe` from the latest release — no Python install needed:
+
+**https://github.com/juren53/HST-Metadata-Audio/releases/latest**
+
+(Current release: [v0.3.9](https://github.com/juren53/HST-Metadata-Audio/releases/tag/v0.3.9).) Batches are tracked in `~/.hstl_audio_framework/config/batch_registry.yaml`, shared with the source version.
+
 ### GUI (recommended)
 
 ```powershell
