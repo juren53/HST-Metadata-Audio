@@ -11,6 +11,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## HAM [0.3.8] - 2026-10-14 2050 CDT
+
+### Added
+- **Step 3 validation, per the Development Plan's Step 3 row:**
+  - *Mutagen write success* — every saved file is re-opened and TIT2,
+    TALB, TRDA and TYER are compared with the CSV, and the tag must be
+    ID3v2.3. Any failed write or mismatch fails the step, and the bad copy
+    is removed from `output/tmp/` so it never reaches Step 4.
+  - *MP3 count vs CSV row count* — tagged, CSV-rows-with-no-MP3 and
+    MP3s-with-no-CSV-row counts are logged; a mismatch is a warning, not
+    a failure, since partial batches are normal.
+  - *External spot-check* — a random sample of tagged files is read with
+    exiftool (ffprobe if exiftool isn't installed; skipped with a warning
+    if neither is) and title/album compared with the CSV. Sample size is
+    `step_configurations.step3.spot_check_count` (default 3).
+  - New report `reports/step3_tag_report.txt`: counts, spot-check
+    results, failures, and every unmatched MP3 / CSV row.
+
+### Changed
+- Step 3 clears MP3s left in `output/tmp/` by an earlier run before
+  tagging, so Step 4 only processes this run's output.
+- The TEXT frame now records the running version (`HAM v{__version__}`)
+  instead of the hardcoded `HAM v0.1.0`.
+
+### Fixed
+- **ID3v2.3 date frames lost or misread** — Mutagen's default `ID3()`
+  load translates v2.3 TRDA/TYER/TDAT into the v2.4 TDRC frame. Step 4
+  re-saved files loaded that way, dropping TRDA and TDAT and leaving a
+  v2.4-only TDRC frame inside a v2.3 tag; Step 5 would have reported
+  "Missing frame: TRDA" for every file. Steps 3 (readback), 4 and 5 now
+  load with `ID3(path, translate=False)`. Verified with exiftool: TDAT,
+  TYER, TORY and TRDA survive a Step-4-style load/save with album art
+  added.
+
 ## HAM [0.3.7] - 2026-10-14 1857 CDT
 
 ### Documentation

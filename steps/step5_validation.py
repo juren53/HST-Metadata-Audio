@@ -71,7 +71,7 @@ def _validate_file(
 
     # --- open ID3 ---
     try:
-        tags = ID3(str(mp3_path))
+        tags = ID3(str(mp3_path), translate=False)  # translate=False keeps v2.3 date frames (TRDA/TDAT) as-is
     except (ID3NoHeaderError, _ID3NHE):
         errors.append("No ID3 header found")
         return False, errors, info

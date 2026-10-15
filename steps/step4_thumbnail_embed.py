@@ -122,7 +122,7 @@ class Step4_ThumbnailEmbed(StepProcessor):
 
             try:
                 try:
-                    tags = ID3(str(src))
+                    tags = ID3(str(src), translate=False)  # translate=False keeps v2.3 date frames (TRDA/TDAT) as-is
                 except ID3NoHeaderError:
                     tags = ID3()
 
@@ -162,7 +162,7 @@ class Step4_ThumbnailEmbed(StepProcessor):
             for path in processed:
                 try:
                     from mutagen.id3 import ID3
-                    tags = ID3(str(path))
+                    tags = ID3(str(path), translate=False)
                     if "APIC:" not in tags and not any(k.startswith("APIC") for k in tags):
                         missing_apic.append(path.name)
                 except Exception:

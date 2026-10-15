@@ -21,6 +21,7 @@ DEFAULT_SETTINGS = {
         },
         "step3": {
             "id3v2_version": 3,
+            "spot_check_count": 3,   # files read back with exiftool/ffprobe
         },
         "step4": {
             "thumbnail_font_size": 24,
