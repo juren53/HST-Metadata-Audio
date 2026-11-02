@@ -24,7 +24,7 @@ Metadata is written using **[Mutagen](https://mutagen.readthedocs.io/)** — a p
 
 **Step 3** copies each matched MP3 to `output/tmp/` and embeds the ID3v2.3 frames listed below via Mutagen (originals in `input/` are never modified). Every file is read back and checked against the CSV, an external spot check is run with exiftool (ffprobe fallback), and a summary is written to `reports/step3_tag_report.txt`.
 
-**Step 4** uses Pillow to draw the accession number on the album-art template (`assets/HST-blank-album-art.jpg`), embeds it as an APIC front-cover frame, and saves the finished MP3 to `output/processed/`. Each output's audio length is checked against its source.
+**Step 4** first asks which album art to use for the batch — one of the two built-in Truman Library images or any image file — then uses Pillow to draw the accession number on it (images larger than 300x300 are shrunk to fit), embeds it as an APIC front-cover frame, and saves the finished MP3 to `output/processed/`. Each output's audio length is checked against its source.
 
 **Step 5** checks every file in `output/processed/` — readable audio, file size, required frames (TIT2, TALB, TPE1, TRDA, TCON), album art, and title/album against the CSV — and writes a timestamped report to `reports/`.
 
@@ -36,7 +36,7 @@ Download `HAM.exe` from the latest release — no Python install needed:
 
 **https://github.com/juren53/HST-Metadata-Audio/releases/latest**
 
-(Current release: [v0.3.9](https://github.com/juren53/HST-Metadata-Audio/releases/tag/v0.3.9).) Batches are tracked in `~/.hstl_audio_framework/config/batch_registry.yaml`, shared with the source version.
+(Current release: [v0.3.10](https://github.com/juren53/HST-Metadata-Audio/releases/tag/v0.3.10).) Batches are tracked in `~/.hstl_audio_framework/config/batch_registry.yaml`, shared with the source version.
 
 ### GUI (recommended)
 
@@ -97,7 +97,9 @@ Audio/
 ├── requirements.txt
 ├── __init__.py                # Version constants
 ├── assets/
-│   └── HST-blank-album-art.jpg  # Step 4 album-art template
+│   ├── TrumanSpeakingAlbumArt_ArialYellow.png  # Step 4 album-art choices
+│   ├── TrumanLibraryAlbumArt_ArialYellow.png
+│   └── HST-blank-album-art.jpg  # Fallback album-art template
 ├── config/
 │   ├── config_manager.py      # YAML-backed batch configuration
 │   └── settings.py            # Defaults and required CSV columns
