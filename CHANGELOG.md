@@ -11,6 +11,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## HAM [0.3.10] - 2026-11-01 1904 CST
+
+### Added
+- **Step 4 album-art selection** — Run Step 4 (and Run All, on reaching
+  Step 4) now opens a Step 4 dialog showing thumbnail tiles for the two
+  bundled images, `assets/TrumanSpeakingAlbumArt_ArialYellow.png` and
+  `assets/TrumanLibraryAlbumArt_ArialYellow.png`, plus a file-icon tile
+  for choosing any image from the file system. The choice is saved in the
+  batch config (`step_configurations.step4.thumbnail_base_image`) and
+  pre-selected the next time; Cancel stops the step. Both images are
+  bundled in `HAM.exe`.
+
+### Changed
+- **Step 4 uses the batch's chosen album art** instead of always using
+  `assets/HST-blank-album-art.jpg`, and logs which image it used. Images
+  larger than 300x300 are shrunk to fit, so a large photo isn't embedded
+  full-size in every MP3.
+- **Default `thumbnail_base_image`** is now the Truman Speaking image; the
+  old default, `assets/HST-thumbnail-c.png`, never existed. A missing
+  bundled image (as in older batch configs) falls back to the blank HST
+  template; a missing custom image is an error.
+
 ## HAM [0.3.9] - 2026-10-14 2139 CDT
 
 ### Fixed

@@ -26,7 +26,7 @@ DEFAULT_SETTINGS = {
         "step4": {
             "thumbnail_font_size": 24,
             "thumbnail_font_color": "yellow",
-            "thumbnail_base_image": "assets/HST-thumbnail-c.png",
+            "thumbnail_base_image": "assets/TrumanSpeakingAlbumArt_ArialYellow.png",
         },
         "step5": {
             "spot_check_count": 3,

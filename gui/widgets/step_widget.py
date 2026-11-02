@@ -11,6 +11,8 @@ QThread worker pattern (Photos/Version-2/Framework/gui/dialogs/step5_dialog.py).
 Step 1 opens gui.dialogs.step1_dialog.Step1Dialog first (mirroring HPM's
 _run_step_1() special-casing in gui/main_window.py) to import the CSV
 and MP3 files before running Step 1's actual validation/matching.
+Step 4 likewise opens gui.dialogs.step4_dialog.Step4Dialog first to pick
+the batch's album art.
 """
 
 from PyQt6.QtWidgets import (
@@ -133,7 +135,8 @@ class StepWidget(QWidget):
 
     def _run_step(self, step_num: int):
         """Entry point for running a step. Step 1 opens Step1Dialog first
-        to import the CSV/MP3 files; other steps dispatch directly."""
+        to import the CSV/MP3 files, Step 4 opens Step4Dialog to pick the
+        album art; other steps dispatch directly."""
         if self.config is None or step_num in self._active_runners:
             return
 
@@ -148,6 +151,18 @@ class StepWidget(QWidget):
                                  config=self.config)
             if dialog.exec() != QDialog.DialogCode.Accepted:
                 self._run_all_active = False  # don't leave "Run All" stuck
+                return
+
+        if step_num == 4:
+            from pathlib import Path
+            from utils.path_manager import PathManager
+            from gui.dialogs.step4_dialog import Step4Dialog
+
+            data_dir = Path(self.config.get("project.data_directory"))
+            paths = PathManager(data_dir)
+            dialog = Step4Dialog(paths, parent=self, config=self.config)
+            if dialog.exec() != QDialog.DialogCode.Accepted:
+                self._run_all_active = False
                 return
 
         self._dispatch_step_run(step_num)

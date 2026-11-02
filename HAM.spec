@@ -6,6 +6,8 @@ datas = [
     ('__init__.py', '.'),
     ('gui/resources/icons', 'gui/resources/icons'),
     ('assets/HST-blank-album-art.jpg', 'assets'),   # Step 4 album-art template
+    ('assets/TrumanSpeakingAlbumArt_ArialYellow.png', 'assets'),   # Step 4 album-art choices
+    ('assets/TrumanLibraryAlbumArt_ArialYellow.png', 'assets'),
 ]
 
 hiddenimports = [
@@ -48,6 +50,7 @@ hiddenimports = [
     'gui.dialogs',
     'gui.dialogs.new_batch_dialog',
     'gui.dialogs.batch_info_dialog',
+    'gui.dialogs.step4_dialog',
     'core',
     'core.pipeline',
     'steps',

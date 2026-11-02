@@ -2,7 +2,9 @@
 Step 4 – Album Art Embedding
 
 For each tagged MP3 in output/tmp/ (Step 3 output):
-  1. Open assets/HST-blank-album-art.jpg with Pillow
+  1. Open the batch's album art with Pillow — the image chosen in the
+     GUI's Step 4 dialog (step_configurations.step4.thumbnail_base_image),
+     shrunk to fit 300x300 if larger
   2. Draw the accession number in Arial Bold 32 / yellow / x=10,y=10
      with a semi-transparent black background box for legibility
   3. Encode the result as JPEG (BytesIO, quality=90)
@@ -38,6 +40,21 @@ _TEXT_COLOR = "yellow"
 _BOX_COLOR  = (0, 0, 0, 128)   # semi-transparent black
 _TEXT_X     = 10
 _TEXT_Y     = 10
+_MAX_SIZE   = 300              # album art is shrunk to fit this square
+
+
+def _resolve_base_image(context: ProcessingContext) -> Path:
+    """The batch's chosen album art. Relative config values name a bundled
+    image under the app folder; if that image is missing (e.g. an older
+    batch config's default), fall back to the blank HST template."""
+    value = context.config.get("step_configurations.step4.thumbnail_base_image")
+    if not value:
+        return context.paths.thumbnail_base
+    path = Path(value)
+    if path.is_absolute():
+        return path
+    path = context.paths.framework_root / path
+    return path if path.exists() else context.paths.thumbnail_base
 
 
 def _load_font(size: int):
@@ -55,6 +72,7 @@ def _make_thumbnail(base_image_path: Path, accession_number: str) -> bytes:
     from PIL import Image, ImageDraw
 
     img = Image.open(base_image_path).convert("RGBA")
+    img.thumbnail((_MAX_SIZE, _MAX_SIZE))  # a large custom image would bloat every MP3
     draw = ImageDraw.Draw(img, "RGBA")
     font = _load_font(_FONT_SIZE)
 
@@ -92,10 +110,11 @@ class Step4_ThumbnailEmbed(StepProcessor):
             result.add_error("output/tmp/ not found — run Step 3 first")
         elif not any(context.paths.working_dir.glob("*.mp3")):
             result.add_error("No MP3 files in output/tmp/ — run Step 3 first")
-        if not context.paths.thumbnail_base.exists():
+        base_image = _resolve_base_image(context)
+        if not base_image.exists():
             result.add_error(
-                f"Base album art not found: {context.paths.thumbnail_base}\n"
-                f"Place HST-blank-album-art.jpg in the assets/ directory."
+                f"Album art not found: {base_image}\n"
+                f"Choose another image in the Step 4 dialog."
             )
         return result
 
@@ -108,7 +127,8 @@ class Step4_ThumbnailEmbed(StepProcessor):
         processed_dir = context.paths.processed_dir
         processed_dir.mkdir(parents=True, exist_ok=True)
 
-        thumbnail_base = context.paths.thumbnail_base
+        thumbnail_base = _resolve_base_image(context)
+        self.logger.info(f"Album art: {thumbnail_base}")
         mp3_files = sorted(context.paths.working_dir.glob("*.mp3"))
 
         ok, failed = [], []
