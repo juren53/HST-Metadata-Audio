@@ -36,7 +36,7 @@ Download `HAM.exe` from the latest release — no Python install needed:
 
 **https://github.com/juren53/HST-Metadata-Audio/releases/latest**
 
-(Current release: [v0.3.10](https://github.com/juren53/HST-Metadata-Audio/releases/tag/v0.3.10).) Batches are tracked in `~/.hstl_audio_framework/config/batch_registry.yaml`, shared with the source version.
+(Current release: [v0.3.11](https://github.com/juren53/HST-Metadata-Audio/releases/tag/v0.3.11).) Batches are tracked in `~/.hstl_audio_framework/config/batch_registry.yaml`, shared with the source version.
 
 ### GUI (recommended)
 
