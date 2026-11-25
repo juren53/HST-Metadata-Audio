@@ -20,9 +20,9 @@ Metadata is written using **[Mutagen](https://mutagen.readthedocs.io/)** — a p
 
 **Step 1** copies the CSV export into the batch and imports MP3s from one or more source folders, matching each CSV row to `<Accession Number>.mp3`. The match result (matched / no MP3 / no CSV row) and the source folders are shown in the Current Batch → Input Files panel.
 
-**Step 2** validates the required fields and converts dates to ISO 8601, writing them to a new `Date ISO` column in the batch's copy of the CSV so later steps can run in separate sessions. Accepted formats include `May 14, 1948`, `January, 1952`, `1961`, `1961-06-15` and the legacy `15-Jun-61`. Date ranges (`X - Y`) are stored as ISO intervals (`1946-09-21/1947-10-22`), with the start date used for the year and DDMM tags. Blank dates become `0000-00-00` with a warning; any unparseable date fails the step.
+**Step 2** checks every CSV field for mojibake — text decoded with the wrong code page, such as a non-breaking space that shows up as `Â` — and repairs it in the batch's copy of the CSV, listing each repair in `reports/step2_mojibake_report.txt` (set `step_configurations.step2.fix_mojibake: false` to fail the step instead). It then validates the required fields and converts dates to ISO 8601, writing them to a new `Date ISO` column in the batch's copy of the CSV so later steps can run in separate sessions. Accepted formats include `May 14, 1948`, `January, 1952`, `1961`, `1961-06-15` and the legacy `15-Jun-61`. Date ranges (`X - Y`) are stored as ISO intervals (`1946-09-21/1947-10-22`), with the start date used for the year and DDMM tags. Blank dates become `0000-00-00` with a warning; any unparseable date fails the step.
 
-**Step 3** copies each matched MP3 to `output/tmp/` and embeds the ID3v2.3 frames listed below via Mutagen (originals in `input/` are never modified). Every file is read back and checked against the CSV, an external spot check is run with exiftool (ffprobe fallback), and a summary is written to `reports/step3_tag_report.txt`.
+**Step 3** copies each matched MP3 to `output/tmp/` and embeds the ID3v2.3 frames listed below via Mutagen, replacing any comment (COMM) frames already in the file. Text is stored as Latin-1 when it fits and as UTF-16 only when it doesn't, because some readers (e.g. Adobe Audition) misread UTF-16 frames (originals in `input/` are never modified). Every file is read back and checked against the CSV, an external spot check is run with exiftool (ffprobe fallback), and a summary is written to `reports/step3_tag_report.txt`.
 
 **Step 4** first asks which album art to use for the batch — one of the two built-in Truman Library images or any image file — then uses Pillow to draw the accession number on it (images larger than 300x300 are shrunk to fit), embeds it as an APIC front-cover frame, and saves the finished MP3 to `output/processed/`. Each output's audio length is checked against its source.
 
@@ -117,7 +117,8 @@ Audio/
 │   ├── path_manager.py        # Batch directory layout
 │   ├── logger.py              # HAMLogger with SUCCESS level
 │   ├── validator.py           # ValidationResult dataclass
-│   └── file_utils.py
+│   ├── file_utils.py
+│   └── text_utils.py          # Mojibake detection (ftfy)
 ├── gui/
 │   ├── main_window.py         # 4-tab QMainWindow
 │   ├── theme.py               # ThemeManager integration (6 themes)
@@ -134,6 +135,7 @@ Audio/
 | Package | Purpose |
 |---|---|
 | [mutagen](https://mutagen.readthedocs.io/) ≥ 1.47 | ID3v2.3 tag embedding (primary) |
+| [ftfy](https://ftfy.readthedocs.io/) ≥ 6.0 | Mojibake detection and repair (Step 2) |
 | [Pillow](https://python-pillow.org/) ≥ 10.0 | Album art generation (Step 4) |
 | [PyYAML](https://pyyaml.org/) ≥ 6.0 | Batch registry and config files |
 | [PyQt6](https://www.riverbankcomputing.com/software/pyqt/) ≥ 6.6 | Desktop GUI |

@@ -1,10 +1,14 @@
 """
 Step 2 – CSV Validation & Date Conversion
 
-Reads the CSV metadata file, converts dates to ISO 8601 (see parse_date
-for the accepted formats; blank dates become 0000-00-00), validates field
-completeness, and writes the converted dates into a "Date ISO" column of
-the batch's copy of the CSV (input/csv/), next to the original "Date".
+Reads the CSV metadata file, checks every field for mojibake (see
+utils/text_utils.py) and repairs it, converts dates to ISO 8601 (see
+parse_date for the accepted formats; blank dates become 0000-00-00),
+validates field completeness, and writes the repairs and the converted
+dates (a "Date ISO" column next to the original "Date") back to the
+batch's copy of the CSV (input/csv/). Mojibake found is listed in
+reports/step2_mojibake_report.txt; with step2.fix_mojibake set to False
+it is reported as errors instead of repaired.
 
 Later steps (run separately in the GUI, or as separate CLI invocations)
 rebuild their records from that column via load_records(), so nothing
@@ -24,6 +28,7 @@ from steps.base_step import StepProcessor, ProcessingContext, StepResult
 from utils.validator import ValidationResult
 from config.settings import REQUIRED_CSV_COLUMNS
 from utils.file_utils import read_csv_text
+from utils.text_utils import fix_mojibake, snippet
 
 
 _MONTH_MAP = {
@@ -217,6 +222,20 @@ class Step2_CSVValidation(StepProcessor):
         an_idx = headers.index("Accession Number")
         date_idx = headers.index("Date")
 
+        # Mojibake check: repaired in place (written back with the Date ISO
+        # column below), or reported as errors if fix_mojibake is off
+        fixes = self._find_mojibake(headers, rows, an_idx)
+        self._write_mojibake_report(context, csv_file, fixes)
+        repair = self.get_step_config(context, "fix_mojibake", True)
+        for line_num, an, col, before, after in fixes:
+            if repair:
+                rows[line_num - 2][headers.index(col)] = after
+                warnings.append(f"Row {line_num} ({an}): repaired mojibake in {col}: "
+                                f"'{snippet(before, after)}' -> '{snippet(after, before)}'")
+            else:
+                errors.append(f"Row {line_num} ({an}): mojibake in {col}: "
+                              f"'{snippet(before, after)}'")
+
         # Convert every row's date; collect all problems before failing
         iso_values: List[str] = []
         for line_num, values in enumerate(rows, start=2):
@@ -246,7 +265,7 @@ class Step2_CSVValidation(StepProcessor):
             self.logger.error(err)
 
         if errors:
-            return StepResult(False, f"{len(errors)} date error(s) found — fix CSV and re-run")
+            return StepResult(False, f"{len(errors)} error(s) found — fix CSV and re-run")
 
         # Write the Date ISO column next to Date (replacing it on a re-run)
         if DATE_ISO_COLUMN in headers:
@@ -274,8 +293,12 @@ class Step2_CSVValidation(StepProcessor):
         context.set_data("csv_records", records)
         context.set_data("csv_file", str(csv_file))
         self.logger.info(f"CSV validated: {len(records)} records loaded")
-        return StepResult(True, f"{len(records)} records loaded successfully",
-                          data={"record_count": len(records)})
+        msg = f"{len(records)} records loaded successfully"
+        if fixes:
+            msg += (f"; repaired mojibake in {len(fixes)} field(s) — "
+                    "see reports/step2_mojibake_report.txt")
+        return StepResult(True, msg,
+                          data={"record_count": len(records), "mojibake_fixed": len(fixes)})
 
     def validate_outputs(self, context: ProcessingContext) -> ValidationResult:
         result = ValidationResult()
@@ -283,3 +306,41 @@ class Step2_CSVValidation(StepProcessor):
         if not records:
             result.add_error("No records stored in context after Step 2")
         return result
+
+    # ── private ───────────────────────────────────────────────────────────
+
+    @staticmethod
+    def _find_mojibake(headers: List[str], rows: List[List[str]],
+                       an_idx: int) -> List[Tuple[int, str, str, str, str]]:
+        """Every cell with mojibake, as (line, accession number, column,
+        original text, repaired text)."""
+        found = []
+        for line_num, values in enumerate(rows, start=2):
+            an = values[an_idx].strip() if an_idx < len(values) else ""
+            for col, value in zip(headers, values):
+                fixed = fix_mojibake(value)
+                if fixed is not None:
+                    found.append((line_num, an, col, value, fixed))
+        return found
+
+    def _write_mojibake_report(self, context: ProcessingContext, csv_file: Path,
+                               fixes: List[Tuple[int, str, str, str, str]]):
+        report_path = context.paths.reports_dir / "step2_mojibake_report.txt"
+        try:
+            report_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(report_path, "w", encoding="utf-8") as fh:
+                fh.write("HAM Step 2 — Mojibake Report\n")
+                fh.write(f"Generated: {datetime.datetime.now():%Y-%m-%d %H:%M:%S}\n")
+                fh.write("=" * 50 + "\n\n")
+                fh.write(f"CSV file : {csv_file.name}\n")
+                fh.write(f"Fields with mojibake: {len(fixes)}\n\n")
+                fh.write("Mojibake is text decoded with the wrong code page, e.g. a\n"
+                         "non-breaking space shown as 'Â' + space (\\xc2\\xa0).\n"
+                         "Non-ASCII characters are shown escaped.\n\n")
+                for line_num, an, col, before, after in fixes:
+                    fh.write(f"Row {line_num}  {an}  [{col}]\n")
+                    fh.write(f"  found : {snippet(before, after)}\n")
+                    fh.write(f"  fixed : {snippet(after, before)}\n\n")
+            self.logger.info(f"Mojibake report: {report_path}")
+        except OSError as e:
+            self.logger.warning(f"Could not write mojibake report: {e}")

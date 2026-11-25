@@ -53,6 +53,27 @@ _READBACK_FRAMES = ("TIT2", "TALB", "TRDA", "TYER")
 _NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
 
 
+def _enc(*values: str) -> int:
+    """ID3v2.3 text encoding for these values: Latin-1 (0) when they all
+    fit, otherwise UTF-16 (1), the only Unicode encoding v2.3 has.
+
+    Latin-1 is preferred because some readers mis-parse UTF-16 frames:
+    Adobe Audition reads a UTF-16 COMM frame one byte off, showing its
+    "Comment" description as CJK characters (issue #7).
+    """
+    try:
+        for v in values:
+            v.encode("latin-1")
+        return 0
+    except UnicodeEncodeError:
+        return 1
+
+
+def _text(frame, value: str, **kw):
+    """Text frame `frame` holding `value`, in Latin-1 when it fits (see _enc)."""
+    return frame(encoding=_enc(value), text=value, **kw)
+
+
 def _check_mutagen() -> bool:
     try:
         import mutagen  # noqa: F401
@@ -160,34 +181,39 @@ class Step3_MetadataEmbed(StepProcessor):
 
                 tags.update_to_v23()
 
-                tags["TIT2"] = TIT2(encoding=3, text=record["title"])
-                tags["TIT1"] = TIT1(encoding=3, text=_STATIC_GROUPING)
-                tags["TIT3"] = TIT3(encoding=3, text=desc_date)
-                tags["TALB"] = TALB(encoding=3, text=an)
-                tags["TPE1"] = TPE1(encoding=3, text=_STATIC_ARTIST)
-                tags["COMM"] = COMM(encoding=3, lang="eng", desc="Comment", text=desc_date)
-                tags["TCOP"] = TCOP(encoding=3, text=record["restrictions"])
-                tags["TPUB"] = TPUB(encoding=3, text=record["copyright"])
-                tags["TSRC"] = TSRC(encoding=3, text=_STATIC_TSRC)
+                tags["TIT2"] = _text(TIT2, record["title"])
+                tags["TIT1"] = _text(TIT1, _STATIC_GROUPING)
+                tags["TIT3"] = _text(TIT3, desc_date)
+                tags["TALB"] = _text(TALB, an)
+                tags["TPE1"] = _text(TPE1, _STATIC_ARTIST)
+                # Replace every COMM frame: assigning tags["COMM"] would leave
+                # the source file's own comment (e.g. COMM::eng) beside ours
+                tags.delall("COMM")
+                tags.add(COMM(encoding=_enc("Comment", desc_date), lang="eng",
+                              desc="Comment", text=desc_date))
+                tags["TCOP"] = _text(TCOP, record["restrictions"])
+                tags["TPUB"] = _text(TPUB, record["copyright"])
+                tags["TSRC"] = _text(TSRC, _STATIC_TSRC)
                 if record["date_ddmm"]:  # partial dates (e.g. "1961") have no DDMM
-                    tags["TDAT"] = TDAT(encoding=3, text=record["date_ddmm"])
-                tags["TYER"] = TYER(encoding=3, text=record["date_year"])
-                tags["TORY"] = TORY(encoding=3, text=record["date_year"])
-                tags["TRDA"] = TRDA(encoding=3, text=record["date_iso"])
-                tags["TOFN"] = TOFN(encoding=3, text=f"{an}.mp3")
-                tags["TCON"] = TCON(encoding=3, text=_STATIC_GENRE)
+                    tags["TDAT"] = _text(TDAT, record["date_ddmm"])
+                tags["TYER"] = _text(TYER, record["date_year"])
+                tags["TORY"] = _text(TORY, record["date_year"])
+                tags["TRDA"] = _text(TRDA, record["date_iso"])
+                tags["TOFN"] = _text(TOFN, f"{an}.mp3")
+                tags["TCON"] = _text(TCON, _STATIC_GENRE)
                 tags["WOAS"] = WOAS(url=_STATIC_SOURCE_URL)
-                tags["WXXX"] = WXXX(encoding=3, desc="", url=_STATIC_CATALOG_URL)
-                tags["TEXT"] = TEXT(encoding=3, text=_TOOL_VERSION)
-                tags["TXXX:ISBJ"] = TXXX(encoding=3, desc="ISBJ", text=desc_date)
-                tags["TXXX:IPRD"] = TXXX(encoding=3, desc="IPRD", text=an)
-                tags["TXXX:TLOC"] = TXXX(encoding=3, desc="TLOC", text=record["place"])
-                tags["TXXX:ICRD"] = TXXX(encoding=3, desc="ICRD", text=date_orig)
+                tags["WXXX"] = WXXX(encoding=0, desc="", url=_STATIC_CATALOG_URL)
+                tags["TEXT"] = _text(TEXT, _TOOL_VERSION)
+                tags["TXXX:ISBJ"] = _text(TXXX, desc_date, desc="ISBJ")
+                tags["TXXX:IPRD"] = _text(TXXX, an, desc="IPRD")
+                tags["TXXX:TLOC"] = _text(TXXX, record["place"], desc="TLOC")
+                tags["TXXX:ICRD"] = _text(TXXX, date_orig, desc="ICRD")
 
                 # IPLS: Involved People List (ID3v2.3 only) — Speakers field.
                 # Pairs are (involvement, person); no role, so involvement is blank.
                 if record["speakers"]:
-                    tags["IPLS"] = IPLS(encoding=3, people=[["", record["speakers"]]])
+                    tags["IPLS"] = IPLS(encoding=_enc(record["speakers"]),
+                                        people=[["", record["speakers"]]])
 
                 tags.save(str(dst_mp3), v2_version=3)
 

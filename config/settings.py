@@ -18,6 +18,7 @@ DEFAULT_SETTINGS = {
     "step_configurations": {
         "step2": {
             "strict_date_validation": True,
+            "fix_mojibake": True,    # False: report mojibake as errors instead
         },
         "step3": {
             "id3v2_version": 3,

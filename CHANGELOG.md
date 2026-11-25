@@ -11,6 +11,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## HAM [0.3.11] - 2026-11-25 1146 CST
+
+### Added
+- **Mojibake check in Step 2** (issue #7) — every CSV field is checked
+  with `ftfy.fix_encoding()` for text decoded with the wrong code page,
+  such as a non-breaking space that reads as `Â` + space in VLC,
+  MediaInfo and Windows Media Player (SR2000-17, SR2000-19). Repairs are
+  written to the batch's copy of the CSV, logged as warnings, and listed
+  in `reports/step2_mojibake_report.txt`. With
+  `step_configurations.step2.fix_mojibake: false` they are reported as
+  errors instead. `fix_encoding()` is used rather than HPM's
+  `fix_text()`, which would also straighten curly quotes and rewrite
+  full-width CJK punctuation in legitimate text. New dependency: `ftfy`.
+
+### Fixed
+- **Chinese characters in Adobe Audition's Comments (ID3, RIFF) and Note
+  (iXML) fields** (issue #7) — Audition reads a UTF-16 COMM frame one
+  byte off, so the frame's `Comment` description showed as `漀洀洀攀渀琀`.
+  Step 3 now stores each text frame as Latin-1 when its text fits, and
+  as UTF-16 only when it doesn't (e.g. Chinese or Korean text, or curly
+  quotes).
+- **Duplicate comment frames** — Step 3 added its COMM frame beside the
+  source file's existing one (e.g. `COMM::eng` "Remarks made by
+  President Truman") instead of replacing it. All COMM frames are now
+  replaced.
+
 ## HAM [0.3.10] - 2026-11-01 1904 CST
 
 ### Added
