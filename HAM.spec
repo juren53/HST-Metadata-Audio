@@ -21,6 +21,15 @@ hiddenimports = [
     'mutagen',
     'mutagen.id3',
     'mutagen.mp3',
+    'ftfy',               # Step 2 mojibake check
+    'ftfy.badness',
+    'ftfy.chardata',
+    'ftfy.fixes',
+    'ftfy.formatting',
+    'ftfy.bad_codecs',    # codecs registered at runtime
+    'ftfy.bad_codecs.sloppy',
+    'ftfy.bad_codecs.utf8_variants',
+    'wcwidth',            # ftfy dependency
     'PIL',
     'yaml',
     'colorama',
@@ -66,6 +75,7 @@ hiddenimports = [
     'utils.logger',
     'utils.validator',
     'utils.file_utils',
+    'utils.text_utils',
     'config',
     'config.config_manager',
     'config.settings',
